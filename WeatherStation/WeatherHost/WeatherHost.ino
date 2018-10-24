@@ -1,18 +1,9 @@
 // Load Wi-Fi library
-//#include <WiFiUdp.h>
-//#include <WiFiServerSecure.h>
-//#include <WiFiServer.h>
-//#include <WiFiClientSecure.h>
-//#include <WiFiClient.h>
-//#include <ESP8266WiFiType.h>
-//#include <ESP8266WiFiSTA.h>
-//#include <ESP8266WiFiScan.h>
-//#include <ESP8266WiFiMulti.h>
-//#include <ESP8266WiFiGeneric.h>
-//#include <ESP8266WiFiAP.h>
 #include <ESP8266WiFi.h>
-
 #include "WifiIdentifier.h"
+
+#include "SensorData.h"
+
 
 // Replace with your network credentials
 const char* ssid = WIFI_SSID;
@@ -33,6 +24,10 @@ String output4State = "off";
 const int output0 = D0;
 const int output5 = D5;
 const int output4 = D4;
+
+const char* SENSORDATA_HEADER = "get /sensordata/";
+// storage
+SensorData sensors[3];
 
 void setup() {
 	Serial.begin(115200);
@@ -84,8 +79,16 @@ void loop() {
 						client.println("Connection: close");
 						client.println();
 
+						String lowercaseheader = header.substring(0); // copy
+						lowercaseheader.toLowerCase();
+
+						if (lowercaseheader.indexOf(SENSORDATA_HEADER) >= 0) {
+							Serial.print("receiving sensor data: ");
+							Serial.println(header);
+							ProcessSensorData(header.substring(strlen(SENSORDATA_HEADER)));
+						}
 						// turns the GPIOs on and off
-						if (header.indexOf("GET /5/on") >= 0) {
+						else if (header.indexOf("GET /5/on") >= 0) {
 							Serial.println("GPIO 5 on");
 							output5State = "on";
 							digitalWrite(output5, HIGH);
@@ -105,45 +108,7 @@ void loop() {
 							output4State = "off";
 							digitalWrite(output4, LOW);
 						}
-
-						// Display the HTML web page
-						client.println("<!DOCTYPE html><html>");
-						client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-						client.println("<link rel=\"icon\" href=\"data:,\">");
-						// CSS to style the on/off buttons 
-						// Feel free to change the background-color and font-size attributes to fit your preferences
-						client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-						client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-						client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-						client.println(".button2 {background-color: #77878A;}</style></head>");
-
-						// Web Page Heading
-						client.println("<body><h1>ESP8266 Web Server</h1>");
-
-						// Display current state, and ON/OFF buttons for GPIO 5  
-						client.println("<p>GPIO 5 - State " + output5State + "</p>");
-						// If the output5State is off, it displays the ON button       
-						if (output5State == "off") {
-							client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
-						}
-						else {
-							client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
-						}
-
-						// Display current state, and ON/OFF buttons for GPIO 4  
-						client.println("<p>GPIO 4 - State " + output4State + "</p>");
-						// If the output4State is off, it displays the ON button       
-						if (output4State == "off") {
-							client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
-						}
-						else {
-							client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
-						}
-						client.println("</body></html>");
-
-						// The HTTP response ends with another blank line
-						client.println();
-						// Break out of the while loop
+						RenderPage(client);
 						break;
 					}
 					else { // if you got a newline, then clear currentLine
@@ -162,4 +127,77 @@ void loop() {
 		Serial.println("Client disconnected.");
 		Serial.println("");
 	}
+}
+
+void ProcessSensorData(String uri)
+{
+	Serial.print("..processing sensor data ");
+	Serial.println(uri);
+	int sensorNameLength = uri.indexOf("/");
+	if (sensorNameLength < 1) {
+		Serial.println("..illegal uri");
+		return;
+	}
+	int sensorId = 0;
+	if (sensorNameLength == 1) {
+		int sensorId = uri[0] - '0';
+	}
+	// else search for sensorName and optionally create an index for it
+	else {
+		Serial.println("..symbolic sensor name not supported yet");
+		return;
+	}
+	uri = uri.substring(sensorNameLength + 1);
+	int sensorTypeLength = uri.indexOf("/");
+	if (sensorTypeLength < 1) {
+		Serial.println("..sensor type not found");
+		return;
+	}
+	String sensorType = uri.substring(0, sensorTypeLength);
+	Serial.print("..found sensor type ");
+	Serial.println(sensorType);
+	if (sensorType.indexOf("temp") == 0) {
+
+	}
+}
+
+void RenderPage(WiFiClient client)
+{
+	// Display the HTML web page
+	client.println("<!DOCTYPE html><html>");
+	client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+	client.println("<link rel=\"icon\" href=\"data:,\">");
+	// CSS to style the on/off buttons 
+	// Feel free to change the background-color and font-size attributes to fit your preferences
+	client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
+	client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
+	client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
+	client.println(".button2 {background-color: #77878A;}</style></head>");
+
+	// Web Page Heading
+	client.println("<body><h1>ESP8266 Web Server</h1>");
+
+	// Display current state, and ON/OFF buttons for GPIO 5  
+	client.println("<p>GPIO 5 - State " + output5State + "</p>");
+	// If the output5State is off, it displays the ON button       
+	if (output5State == "off") {
+		client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
+	}
+	else {
+		client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
+	}
+
+	// Display current state, and ON/OFF buttons for GPIO 4  
+	client.println("<p>GPIO 4 - State " + output4State + "</p>");
+	// If the output4State is off, it displays the ON button       
+	if (output4State == "off") {
+		client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
+	}
+	else {
+		client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
+	}
+	client.println("</body></html>");
+
+	// The HTTP response ends with another blank line
+	client.println();
 }
