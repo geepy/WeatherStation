@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2046
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AlgorithmTestbed", "AlgorithmTestbed\AlgorithmTestbed.vcxproj", "{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WeatherHost", "WeatherHost\WeatherHost.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WeatherSensor", "WeatherSensor\WeatherSensor.vcxproj", "{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Debug|x64.ActiveCfg = Debug|x64
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Debug|x64.Build.0 = Debug|x64
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Debug|x86.ActiveCfg = Debug|Win32
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Debug|x86.Build.0 = Debug|Win32
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Release|x64.ActiveCfg = Release|x64
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Release|x64.Build.0 = Release|x64
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Release|x86.ActiveCfg = Release|Win32
+		{3C64EB37-8EC7-4D5E-B802-37A2B250D6F4}.Release|x86.Build.0 = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x64.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x64.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Debug|x64.ActiveCfg = Debug|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Debug|x86.ActiveCfg = Debug|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Debug|x86.Build.0 = Debug|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Release|x64.ActiveCfg = Release|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Release|x86.ActiveCfg = Release|Win32
+		{73D5BCAB-1ED1-4BDC-95DB-873F2FC5F7B7}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1C0EDC1B-27EF-41DB-8002-1FF563B8B52E}
+	EndGlobalSection
+EndGlobal
