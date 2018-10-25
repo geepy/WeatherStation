@@ -1,13 +1,23 @@
-struct SensorData
+#ifndef __ISDEFINED_SENSORDATA
+#define __ISDEFINED_SENSORDATA
+
+#define SENSORDATA_NO_DATA -1000.
+
+class SensorData
 {
  protected:
 
 
  public:
-	 char SensorName[40];
-	 float Temperature=0;
-	 float Pressure=0;
-	 float Brightness=0;
-	 float Humidity=0;
+	 const char *SensorName;
+	 float Temperature;
+	 float Pressure;
+	 float Brightness;
+	 float Humidity;
+
+	 SensorData();
+	 void WriteToSerial();
 };
 
+
+#endif // !__ISDEFINED_SENSORDATA

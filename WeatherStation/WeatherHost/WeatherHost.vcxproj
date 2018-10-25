@@ -107,6 +107,9 @@
     <ClInclude Include="WifiIdentifier.h" />
     <ClInclude Include="__vm\.WeatherHost.vsarduino.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="SensorData.cpp" />
+  </ItemGroup>
   <PropertyGroup>
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>
   </PropertyGroup>
