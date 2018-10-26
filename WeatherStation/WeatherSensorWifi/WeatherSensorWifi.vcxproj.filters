@@ -15,22 +15,14 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="WeatherHost.ino" />
+    <None Include="WeatherSensorWifi.ino" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="__vm\.WeatherHost.vsarduino.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SensorData.h">
+    <ClInclude Include="__vm\.WeatherSensorWifi.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\WifiIdentifier.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="SensorData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>

@@ -80,17 +80,17 @@ void loop() {
 					if (currentLine.length() == 0) {
 						// HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
 						// and a content-type so the client knows what's coming, then a blank line:
-						client.println("HTTP/1.1 200 OK");
-						client.println("Content-type:text/html");
-						client.println("Connection: close");
-						client.println();
 
 						uri.toLowerCase();
 
 						if (uri.indexOf(SENSORDATA_HEADER) >= 0) {
 							Serial.print("receiving sensor data: ");
 							Serial.println(uri);
-							ProcessSensorData(uri.substring(strlen(SENSORDATA_HEADER)));
+							if (!ProcessSensorData(uri.substring(strlen(SENSORDATA_HEADER))))
+							{
+								client.println("HTTP/1.1 500 BAD URI");
+								break;
+							}
 						}
 						// turns the GPIOs on and off
 						else if (header.indexOf("GET /5/on") >= 0) {
@@ -112,7 +112,8 @@ void loop() {
 							Serial.println("GPIO 4 off");
 							output4State = "off";
 							digitalWrite(output4, LOW);
-						}
+						} 
+						client.println("HTTP/1.1 200 OK");
 						RenderPage(client);
 						break;
 					}
@@ -135,14 +136,14 @@ void loop() {
 	}
 }
 
-void ProcessSensorData(String uri)
+bool ProcessSensorData(String uri)
 {
 	Serial.print("..processing sensor data ");
 	Serial.println(uri);
 	int offset = uri.indexOf("/");
 	if (offset < 1) {
 		Serial.println("..illegal uri");
-		return;
+		return false;
 	}
 	int sensorId = 0;
 	if (offset == 1) {
@@ -151,17 +152,17 @@ void ProcessSensorData(String uri)
 	// else search for sensorName and optionally create an index for it
 	else {
 		Serial.println("..symbolic sensor name not supported yet");
-		return;
+		return false;
 	}
 	if (sensorId < 0 || sensorId > 2) {
 		Serial.println("..illegal sensor id");
-		return;
+		return false;
 	}
 	uri = uri.substring(offset + 1);
 	offset = uri.indexOf("/");
 	if (offset < 1) {
 		Serial.println("..sensor type not found");
-		return;
+		return false;
 	}
 	String sensorType = uri.substring(0, offset);
 	Serial.print("..found sensor type ");
@@ -180,7 +181,13 @@ void ProcessSensorData(String uri)
 	else if (sensorType.indexOf("bright") == 0) {
 		sensors[sensorId].Brightness = sensorValue;
 	}
+	else {
+		Serial.print("..unsupported sensor type: ");
+		Serial.println(sensorType);
+		return false;
+	}
 	sensors[sensorId].WriteToSerial();
+	return true;
 }
 
 void ConnectToWifi()
@@ -203,6 +210,10 @@ void ConnectToWifi()
 }
 void RenderPage(WiFiClient client)
 {
+	client.println("Content-type:text/html");
+	client.println("Connection: close");
+	client.println();
+
 	// Display the HTML web page
 	client.println("<!DOCTYPE html><html>");
 	client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
