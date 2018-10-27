@@ -49,71 +49,43 @@ void loop() {
 		Serial.println("New Client.");          // print a message out in the serial port
 		String method = "";
 		boolean hasMethod = false;
-		String uri = "";
+		String stem = "";
 		boolean hasUri = false;
 		String currentLine = "";                // make a String to hold incoming data from the client
+		long timestamp = millis();
 		while (client.connected()) {            // loop while the client's connected
+			if (millis() - timestamp > 5000) {
+				Serial.println("->client not responsive, closing connection");
+				break;
+			}
 			if (client.available()) {             // if there's bytes to read from the client,
 				char c = client.read();             // read a byte, then
 				Serial.write(c);                    // print it out the serial monitor
 				header += c;
-				if (c == ' ') {
-					if (!hasMethod) {
-						hasMethod = true;
-					}
-					else if (!hasUri) {
-						hasUri = true;
-					}
-				}
-				else {
-					if (!hasMethod) {
-						method += c;
-					} else
+				if (c == '\n') {            // if the byte is a newline character
 					if (!hasUri) {
-						uri += c;
+						method = header.substring(0, header.indexOf(" "));
+						stem = header.substring(method.length() + 1, header.indexOf(" ", method.length() + 1));
+						hasUri = true;			
 					}
-				}
-				if (c == '\n') {                    // if the byte is a newline character
-					hasUri = true; // URI is only in the first line
-				  // if the current line is blank, you got two newline characters in a row.
-				  // that's the end of the client HTTP request, so send a response:
+					// if the current line is blank, you got two newline characters in a row.
+					// that's the end of the client HTTP request, so send a response:
 					if (currentLine.length() == 0) {
-						// HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-						// and a content-type so the client knows what's coming, then a blank line:
+						stem.toLowerCase();
 
-						uri.toLowerCase();
-
-						if (uri.indexOf(SENSORDATA_HEADER) >= 0) {
+						if (stem.indexOf(SENSORDATA_HEADER) >= 0) {
 							Serial.print("receiving sensor data: ");
-							Serial.println(uri);
-							if (!ProcessSensorData(uri.substring(strlen(SENSORDATA_HEADER))))
+							Serial.println(stem);
+							if (!ProcessSensorData(stem.substring(strlen(SENSORDATA_HEADER))))
 							{
 								client.println("HTTP/1.1 500 BAD URI");
 								break;
 							}
+							else {
+								RenderDataReceived(client);
+								break;
+							}
 						}
-						// turns the GPIOs on and off
-						else if (header.indexOf("GET /5/on") >= 0) {
-							Serial.println("GPIO 5 on");
-							output5State = "on";
-							digitalWrite(output5, HIGH);
-						}
-						else if (header.indexOf("GET /5/off") >= 0) {
-							Serial.println("GPIO 5 off");
-							output5State = "off";
-							digitalWrite(output5, LOW);
-						}
-						else if (header.indexOf("GET /4/on") >= 0) {
-							Serial.println("GPIO 4 on");
-							output4State = "on";
-							digitalWrite(output4, HIGH);
-						}
-						else if (header.indexOf("GET /4/off") >= 0) {
-							Serial.println("GPIO 4 off");
-							output4State = "off";
-							digitalWrite(output4, LOW);
-						} 
-						client.println("HTTP/1.1 200 OK");
 						RenderPage(client);
 						break;
 					}
@@ -128,7 +100,7 @@ void loop() {
 		}
 		// Clear the header variable
 		header = "";
-		uri = "";
+		stem = "";
 		// Close the connection
 		client.stop();
 		Serial.println("Client disconnected.");
@@ -142,7 +114,7 @@ bool ProcessSensorData(String uri)
 	Serial.println(uri);
 	int offset = uri.indexOf("/");
 	if (offset < 1) {
-		Serial.println("..illegal uri");
+		Serial.println("..illegal stem");
 		return false;
 	}
 	int sensorId = 0;
@@ -208,22 +180,33 @@ void ConnectToWifi()
 	Serial.println(WiFi.localIP());
 	server.begin();
 }
+
+void RenderDataReceived(WiFiClient client) {
+	client.println("HTTP/1.1 200 OK");
+	client.println("Content-type:text/plain");
+	client.println("Connection: close");
+	client.println();
+	client.println("data received");
+
+	client.println();
+}
+
 void RenderPage(WiFiClient client)
 {
+	client.println("HTTP/1.1 200 OK");
 	client.println("Content-type:text/html");
 	client.println("Connection: close");
 	client.println();
 
 	// Display the HTML web page
 	client.println("<!DOCTYPE html><html>");
-	client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+	client.println("<head>");
+	client.println("<meta http-equiv='refresh' content='60'>");
 	client.println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
-	// CSS to style the on/off buttons 
-	// Feel free to change the background-color and font-size attributes to fit your preferences
+	// CSS 
 	client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-	client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-	client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-	client.println(".button2 {background-color: #77878A;}</style></head>");
+	client.println("</style>");
+	client.println("</head>");
 
 	// Web Page Heading
 	client.println("<body><h1>Online-Wetterstation Lessingstra&szlig;e 36</h1>");
@@ -233,8 +216,6 @@ void RenderPage(WiFiClient client)
 	WriteSensorData(client, &sensors[1]);
 	WriteSensorData(client, &sensors[2]);
 	WriteSensorFooter(client);
-
-	WriteGPIOStateAndButtons(client);
 
 	client.println("</body></html>");
 
@@ -248,7 +229,7 @@ void WriteSensorHeader(WiFiClient client) {
 }
 
 void WriteSensorFooter(WiFiClient client) {
-	client.println("</table>"); 
+	client.println("</table>");
 }
 
 void WriteSensorData(WiFiClient client, SensorData* sensor) {
