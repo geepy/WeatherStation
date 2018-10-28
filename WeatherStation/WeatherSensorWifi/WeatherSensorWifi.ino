@@ -20,6 +20,9 @@ const char* hostname = "Draussen";
 const char* servername = "wetterstation";
 
 const int delay_ms = 10000;
+const int sleep_seconds = 60;
+
+// #define DEBUG
 
 const int SENSOR_POWER = D5;
 #define SENSOR_CLOCK 5
@@ -40,24 +43,26 @@ WiFiClient client;
 // the setup function runs once when you press reset or power the board
 void setup() {
 	Serial.begin(115200);
-	bh1750.begin();
-	bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
+	//bh1750.begin();
+	//bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
 	dht.begin();
 	if (WiFiStart()) {
-		RunOneLoop();
+		MeasureAndReportData();
 	}
-	Serial.println("Going into deep sleep for 20 seconds");
-	ESP.deepSleep(20e6); // 20e6 is 20*10^6 microseconds = 20 secs
+#ifndef DEBUG
+	Serial.printf("Going into deep sleep for %d seconds\r\n", sleep_seconds);
+	ESP.deepSleep(sleep_seconds * 1e6); // 1e6 is *10^6 microseconds = secs
+#endif
 	// nach dem sleep beginnt wieder setup()
 }
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-	RunOneLoop();
+	MeasureAndReportData();
 	delay(delay_ms);
 }
 
-void RunOneLoop() {
+void MeasureAndReportData() {
 	float value;
 	value = readTemperatureFromDHT22();
 	SendData("temperature", value);
@@ -65,8 +70,8 @@ void RunOneLoop() {
 	//SendData("pressure", value);
 	value = readHumidity();
 	SendData("humidity", value);
-	value = readBrightness();
-	SendData("brightness", value);
+	//value = readBrightness();
+	//SendData("brightness", value);
 }
 
 void SendData(const char* type, float value) {
@@ -125,6 +130,8 @@ void SendData(const char* type, float value) {
 				Serial.println(WiFi.localIP());
 				return true;
 			}
+			Serial.print(".");
+			delay(1000);
 		}
 		Serial.println("No Wifi connection possible");
 		return false;
