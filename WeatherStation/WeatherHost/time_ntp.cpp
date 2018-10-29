@@ -8,21 +8,16 @@ code for ntp adopted from Michael Margolis
 code for time conversion based on http://stackoverflow.com/
 -----------------------------------------------------------*/
 
-// note: all timing relates to 01.01.2000
+// note: all timing relates to 01.01.1970
 
+#include <ESP8266WiFi.h>
+#include <WifiUdp.h>
 #include "time_ntp.h"
 
 // NTP specifics
 IPAddress timeServer(129, 6, 15, 28); // time.nist.gov NTP server
-WiFiUDP udp;  // A UDP instance to let us send and receive packets over UDP
 unsigned int ntpPort = 2390;          // local port to listen for UDP packets
-const int NTP_PACKET_SIZE = 48;       // NTP time stamp is in the first 48 bytes of the message
-byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 
-
-unsigned long NTP::GetTimestamp() {
-	return getNTPTimestamp();
-}
 
 date_time_t NTP::GetTimeStruct(unsigned long secondsSince1970) {
 	date_time_t result;
@@ -40,7 +35,7 @@ int lastsundayofmonth[7] = { 28,29,30,31,25,26,27 };
 unsigned long NTP::GetLocalTime() {
 	date_time_t dateAndTime;
 	date_time_t firstOfMonth;
-	unsigned long now = getNTPTimestamp();
+	unsigned long now = GetTimestamp();
 	unsigned long firstOfMonthTimestamp;
 	int dayOfTimeChange;
 	epoch_to_date_time(&dateAndTime, now);
@@ -88,7 +83,7 @@ static unsigned short days[4][12] =
 
 
 
-unsigned int date_time_to_epoch(date_time_t* date_time)
+unsigned int NTP::date_time_to_epoch(date_time_t* date_time)
 {
 	unsigned int second = date_time->second;  // 0-59
 	unsigned int minute = date_time->minute;  // 0-59
@@ -99,7 +94,7 @@ unsigned int date_time_to_epoch(date_time_t* date_time)
 	return (((year / 4 * (365 * 4 + 1) + days[year % 4][month] + day) * 24 + hour) * 60 + minute) * 60 + second;
 }
 
-unsigned long getNTPTimestamp()
+unsigned long NTP::GetTimestamp()
 {
 	unsigned long ulSecs1970;
 
@@ -136,7 +131,7 @@ unsigned long getNTPTimestamp()
 }
 
 // send an NTP request to the time server at the given address
-unsigned long sendNTPpacket(IPAddress& address)
+unsigned long NTP::sendNTPpacket(IPAddress& address)
 {
 	// set all bytes in the buffer to 0
 	memset(packetBuffer, 0, NTP_PACKET_SIZE);
@@ -161,7 +156,7 @@ unsigned long sendNTPpacket(IPAddress& address)
 }
 
 
-void epoch_to_date_time(date_time_t* date_time, unsigned int epoch)
+void NTP::epoch_to_date_time(date_time_t* date_time, unsigned int epoch)
 {
 	date_time->second = epoch % 60; epoch /= 60;
 	date_time->minute = epoch % 60; epoch /= 60;
@@ -188,7 +183,7 @@ void epoch_to_date_time(date_time_t* date_time, unsigned int epoch)
 	date_time->day = epoch - days[year][month] + 1;
 }
 
-String epoch_to_string(unsigned int epoch)
+String NTP::epoch_to_string(unsigned int epoch)
 {
 	date_time_t date_time;
 	epoch_to_date_time(&date_time, epoch);
@@ -215,7 +210,7 @@ String epoch_to_string(unsigned int epoch)
 }
 
 // returns weekday, 0= monday, 6=sunday 
-int epoch_to_weekday(unsigned int epoch)
+int NTP::epoch_to_weekday(unsigned int epoch)
 {
 	return ((epoch / 86400) % 7 + 4) % 7;
 }

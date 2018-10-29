@@ -16,15 +16,6 @@ WiFiServer server(80);
 // Variable to store the HTTP request
 String header;
 
-// Auxiliar variables to store the current output state
-String output5State = "off";
-String output4State = "off";
-
-// Assign output variables to GPIO pins
-const int output0 = D0;
-const int output5 = D5;
-const int output4 = D4;
-
 const char* SENSORDATA_HEADER = "/sensordata/";
 // storage
 const char* SENSOR0_NAME = "Drinnen";
@@ -204,18 +195,16 @@ void RenderPage(WiFiClient client)
 	client.println("<meta http-equiv='refresh' content='60'>");
 	client.println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
 	// CSS 
-	client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
+	client.println("<style>html { font-family: Helvetica; font-size:14px; display: inline-block; margin: 0px auto; text-align: center;}");
 	client.println("</style>");
 	client.println("</head>");
 
 	// Web Page Heading
 	client.println("<body><h1>Online-Wetterstation Lessingstra&szlig;e 36</h1>");
 
-	WriteSensorHeader(client);
 	WriteSensorData(client, &sensors[0]);
 	WriteSensorData(client, &sensors[1]);
 	WriteSensorData(client, &sensors[2]);
-	WriteSensorFooter(client);
 
 	client.println("</body></html>");
 
@@ -223,59 +212,24 @@ void RenderPage(WiFiClient client)
 	client.println();
 }
 
-void WriteSensorHeader(WiFiClient client) {
-	client.println("<table>");
-	client.println("<thead><th></th><th>Temperatur</th><th>Luftfeuchtigkeit</th><th>Luftdruck</th><th>Helligkeit</th></thead>");
-}
-
-void WriteSensorFooter(WiFiClient client) {
+void WriteSensorData(WiFiClient client, SensorData* sensor) {
+	client.println("<h3>"); client.print(sensor->SensorName); client.print("</h3>");
+	client.print("<table width='100%'>");
+	WriteSensorValue(client, "Temperatur", sensor->Temperature, "Grad");
+	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, "%");
+	WriteSensorValue(client, "Luftdruck", sensor->Pressure, "hPa");
+	WriteSensorValue(client, "Helligkeit", sensor->Brightness, "cd");
 	client.println("</table>");
 }
 
-void WriteSensorData(WiFiClient client, SensorData* sensor) {
-	client.print("<tr>");
-	client.print("<td><b>"); client.print(sensor->SensorName); client.print("</b></td>");
-	WriteSensorValue(client, sensor->Temperature, "Grad");
-	WriteSensorValue(client, sensor->Humidity, "%");
-	WriteSensorValue(client, sensor->Pressure, "hPa");
-	WriteSensorValue(client, sensor->Brightness, "cd");
-	client.println("</tr>");
-}
-
-void WriteSensorValue(WiFiClient client, float data, const char* suffix)
+void WriteSensorValue(WiFiClient client, const char* description, float data, const char* suffix)
 {
 	char number_buffer[10];
-	client.print("<td>");
 	if (data != SENSORDATA_NO_DATA) {
+		client.printf("<tr><td><b>%s</b></td>");
 		dtostrf(data, 6, 1, number_buffer);
-		client.print(number_buffer);
-		client.print(" ");
-		client.print(suffix);
-	}
-	else {
-		client.print("(n/a)");
-	}
-	client.print("</td>");
-}
-
-void WriteGPIOStateAndButtons(WiFiClient client) {
-	// Display current state, and ON/OFF buttons for GPIO 5  
-	client.println("<p>GPIO 5 - State " + output5State + "</p>");
-	// If the output5State is off, it displays the ON button       
-	if (output5State == "off") {
-		client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
-	}
-	else {
-		client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
-	}
-
-	// Display current state, and ON/OFF buttons for GPIO 4  
-	client.println("<p>GPIO 4 - State " + output4State + "</p>");
-	// If the output4State is off, it displays the ON button       
-	if (output4State == "off") {
-		client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
-	}
-	else {
-		client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
+		client.printf("<td>%s %s</td>", number_buffer, suffix);
+		client.println("</tr>");
 	}
 }
+

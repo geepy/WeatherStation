@@ -9,7 +9,8 @@ class SensorData
 
 
  public:
-	 const char *SensorName;
+	 const char* SensorName;
+	 unsigned long timestamp;
 	 float Temperature;
 	 float Pressure;
 	 float Brightness;

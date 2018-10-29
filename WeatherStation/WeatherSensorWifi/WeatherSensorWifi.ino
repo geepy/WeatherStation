@@ -24,7 +24,7 @@ const int sleep_seconds = 60;
 
 // #define DEBUG
 
-const int SENSOR_POWER = D5;
+#define SENSOR_POWER D6
 #define SENSOR_CLOCK 5
 #define SENSOR_DATA 4
 
@@ -43,6 +43,8 @@ WiFiClient client;
 // the setup function runs once when you press reset or power the board
 void setup() {
 	Serial.begin(115200);
+	pinMode(SENSOR_POWER, OUTPUT);
+	digitalWrite(SENSOR_POWER, HIGH);
 	//bh1750.begin();
 	//bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
 	dht.begin();
@@ -51,6 +53,7 @@ void setup() {
 	}
 #ifndef DEBUG
 	Serial.printf("Going into deep sleep for %d seconds\r\n", sleep_seconds);
+	pinMode(SENSOR_POWER, LOW);
 	ESP.deepSleep(sleep_seconds * 1e6); // 1e6 is *10^6 microseconds = secs
 #endif
 	// nach dem sleep beginnt wieder setup()

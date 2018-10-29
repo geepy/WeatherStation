@@ -17,6 +17,8 @@ code for time conversion based on http://stackoverflow.com/
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 
+const int NTP_PACKET_SIZE = 48;       // NTP time stamp is in the first 48 bytes of the message
+
 typedef struct
 {
     unsigned char second; // 0-59
@@ -30,10 +32,19 @@ date_time_t;
 
 class NTP {
 public:
-	static unsigned long GetTimestamp();
-	static date_time_t GetTimeStruct(unsigned long secondsSince1970);
-	static String GetTimeString(unsigned long secondsSince1970);
-	static unsigned long GetLocalTime();
+	unsigned long GetTimestamp();
+	date_time_t GetTimeStruct(unsigned long secondsSince1970);
+	String GetTimeString(unsigned long secondsSince1970);
+	unsigned long GetLocalTime();
+
+private:
+	unsigned long sendNTPpacket(IPAddress& address);
+	String epoch_to_string(unsigned int epoch);
+	void epoch_to_date_time(date_time_t* date_time, unsigned int epoch);
+	unsigned int date_time_to_epoch(date_time_t* date_time);
+	int epoch_to_weekday(unsigned int epoch);
+	WiFiUDP udp;  // A UDP instance to let us send and receive packets over UDP
+	byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 };
 
 #endif
