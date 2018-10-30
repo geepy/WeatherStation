@@ -193,9 +193,10 @@ void RenderPage(WiFiClient client)
 	client.println("<!DOCTYPE html><html>");
 	client.println("<head>");
 	client.println("<meta http-equiv='refresh' content='60'>");
+	client.println("<meta name='viewport' content='width = 640, height=960,initial - scale = 1'>");
 	client.println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
 	// CSS 
-	client.println("<style>html { font-family: Helvetica; font-size:14px; display: inline-block; margin: 0px auto; text-align: center;}");
+	client.println("<style>html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;}");
 	client.println("</style>");
 	client.println("</head>");
 
@@ -226,7 +227,7 @@ void WriteSensorValue(WiFiClient client, const char* description, float data, co
 {
 	char number_buffer[10];
 	if (data != SENSORDATA_NO_DATA) {
-		client.printf("<tr><td><b>%s</b></td>");
+		client.printf("<tr><td><b>%s</b></td>", description);
 		dtostrf(data, 6, 1, number_buffer);
 		client.printf("<td>%s %s</td>", number_buffer, suffix);
 		client.println("</tr>");
