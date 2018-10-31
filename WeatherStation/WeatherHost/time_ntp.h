@@ -26,7 +26,7 @@ typedef struct
     unsigned char hour;   // 0-23
     unsigned char day;    // 1-31
     unsigned char month;  // 1-12
-    unsigned char year;   // 0-99 (representing 2000-2099)
+    unsigned short year;   // 2000-9999 
 }
 date_time_t;
 

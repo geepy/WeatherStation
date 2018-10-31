@@ -59,8 +59,8 @@ unsigned long NTP::GetLocalTime() {
 		now += 3600;
 		firstOfMonth.year = dateAndTime.year;
 		firstOfMonth.month = dateAndTime.month;
-		dateAndTime.day = 1;
-		dateAndTime.hour = dateAndTime.minute = dateAndTime.second = 0;
+		firstOfMonth.day = 1;
+		firstOfMonth.hour = firstOfMonth.minute = firstOfMonth.second = 0;
 		firstOfMonthTimestamp = date_time_to_epoch(&firstOfMonth);
 		dayOfTimeChange = lastsundayofmonth[epoch_to_weekday(firstOfMonthTimestamp)];
 		if ((dateAndTime.day < dayOfTimeChange && dateAndTime.month == 10)
@@ -188,7 +188,7 @@ void NTP::epoch_to_date_time(date_time_t* date_time, unsigned long epoch)
 			break;
 	}
 
-	date_time->year = years + year +1970;
+	date_time->year = years + year + 1970;
 	date_time->month = month + 1;
 	date_time->day = epoch - days[year][month] + 1;
 	Serial.printf("NTP: transform %lu to %d . %d . %d %d : %d : %d", inputValue,
@@ -217,7 +217,7 @@ String NTP::epoch_to_string(unsigned long epoch)
 	s += ".";
 	s += date_time.month;
 	s += ".";
-	s += 2000 + (int)date_time.year;
+	s += (int)date_time.year;
 
 	return(s);
 }

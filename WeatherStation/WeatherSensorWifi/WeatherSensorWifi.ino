@@ -50,6 +50,9 @@ struct {
 	boolean pressureHasChanged = false;
 	float humidity = NO_SENSOR_DATA;
 	boolean humidityHasChanged = false;
+	uint16_t voltage = NO_SENSOR_DATA;
+	uint16_t maxVoltage = NO_SENSOR_DATA;
+	boolean voltageHasChanged = false;
 } State;
 
 #pragma region global objects
@@ -57,6 +60,7 @@ AS_BH1750 bh1750;         // Helligkeitssensor
 BMP180 bmp180;            // Temperatur- und Druck-Sensor
 DHT dht(D7, DHT22);        // Temperatur- und Feuchte-Sensor
 WiFiClient client;
+ADC_MODE(ADC_VCC);//Set the ADCC to read supply voltage.
 #pragma endregion
 
 // the setup function runs once when you press reset or power the board
@@ -110,6 +114,14 @@ void GetSensorData() {
 	//SendData("pressure", value);
 	//value = readBrightness();
 	//SendData("brightness", value);
+
+	uint16_t voltage = ESP.getVcc();
+	if (voltage > State.voltage + 10) {
+		State.maxVoltage = State.voltage = voltage;
+	}
+	else if (abs(State.voltage - voltage) > 10) {
+		State.voltage = voltage;
+	}
 }
 
 boolean DataChanged() {
@@ -128,6 +140,9 @@ void ReportData(boolean force) {
 	if ((force || State.humidityHasChanged) && State.humidity != NO_SENSOR_DATA) {
 		SendData("humidity", State.humidity);
 		State.humidityHasChanged = false;
+	}
+	if (force) {
+		SendData("voltage", State.voltage);
 	}
 }
 

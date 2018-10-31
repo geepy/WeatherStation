@@ -137,17 +137,24 @@ bool ProcessSensorData(String uri)
 	Serial.println(sensorType);
 	uri = uri.substring(offset + 1);
 	float sensorValue = uri.toFloat();
-	if (sensorType.indexOf("temp") == 0) {
+	if (uri == "nan") {
+		// ignore, keep last value
+	}
+	else if (sensorType.indexOf("temp") == 0) {
 		sensors[sensorId].Temperature = sensorValue;
+		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else if (sensorType.indexOf("press") == 0) {
 		sensors[sensorId].Pressure = sensorValue;
+		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else if (sensorType.indexOf("humid") == 0) {
 		sensors[sensorId].Humidity = sensorValue;
+		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else if (sensorType.indexOf("bright") == 0) {
 		sensors[sensorId].Brightness = sensorValue;
+		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else {
 		Serial.print("..unsupported sensor type: ");
@@ -200,6 +207,7 @@ void RenderPage(WiFiClient* client)
 	client->println("<meta http-equiv='refresh' content='60'>");
 	client->println("<meta name='viewport' content='width = 640, height=960,initial - scale = 1'>");
 	client->println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
+	client->println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"shortcut icon\" type = \"image/x-icon\" / >");
 	// CSS 
 	client->println("<style>");
 	client->print("html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;} ");
@@ -231,6 +239,8 @@ void WriteSensorData(WiFiClient* client, SensorData* sensor) {
 	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, "%");
 	WriteSensorValue(client, "Luftdruck", sensor->Pressure, "hPa");
 	WriteSensorValue(client, "Helligkeit", sensor->Brightness, "cd");
+	String lastTime = ntp->GetTimeString(sensor->timestamp);
+	client->printf("<tr><td>Letzter Kontakt</td><td>%s</td</tr>", lastTime.c_str());
 	client->println("</table>");
 }
 
@@ -246,14 +256,17 @@ void WriteSensorValue(WiFiClient* client, const char* description, float data, c
 void GetCurrentTime()
 {
 	unsigned long currentTime = ntp->GetLocalTime(); // current time in seconds since 1.1.1970
-	currentTime *= 1000; // to align with millis() call
-	timeOffset = currentTime - millis();
+	timeOffset = currentTime - (millis()/1000);
+	Serial.printf("current epoch is %ld, millis is %ld, offset is %ld\n", currentTime, millis(), timeOffset);
 }
 
 void WriteCurrentTime(WiFiClient* client)
 {
 	Serial.print("TIME: es ist ");
-	String s = ntp->GetTimeString(millis() + timeOffset);
-	client->println(ntp->GetTimeString((millis() + timeOffset)/1000));
-	Serial.print(s);
+	unsigned long epoch = millis()/1000 + timeOffset;
+	Serial.print(epoch);
+	Serial.print(" -> ");
+	String s = ntp->GetTimeString(epoch);
+	client->println(s);
+	Serial.println(s);
 }
