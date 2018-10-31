@@ -26,5 +26,8 @@
     <ClCompile Include="AlgorithmTestbed.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ArduinoUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

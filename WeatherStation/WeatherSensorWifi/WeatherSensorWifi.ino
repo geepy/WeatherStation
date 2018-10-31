@@ -5,6 +5,7 @@
 */
 
 #include <Wire.h>         // i²c-Schnittstelle
+#include <EEPROM.h>		  // non-volatile memory
 #include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
 #include "dht.h"	      // patched Temperatur-/Feuchtigkeit-Sensor
 #include <AS_BH1750.h>    // Helligkeitssensor
@@ -20,9 +21,17 @@ const char* hostname = "Draussen";
 const char* servername = "wetterstation";
 
 const int delay_ms = 10000;
-const int sleep_seconds = 60;
 
 // #define DEBUG
+// #define SLEEP
+
+#ifdef DEBUG
+#define SECONDS_BETWEEN_TICKS 10
+#define MAX_TICKS_BETWEEN_TRANSMISSION 2
+#else
+#define SECONDS_BETWEEN_TICKS 60
+#define MAX_TICKS_BETWEEN_TRANSMISSION 10
+#endif
 
 #define SENSOR_POWER D6
 #define SENSOR_CLOCK 5
@@ -31,7 +40,17 @@ const int sleep_seconds = 60;
 const int samplesForPressure = 4;
 #pragma endregion
 
-float temp = 10;
+#define NO_SENSOR_DATA 200
+
+struct {
+	int ticksSinceLastTransmission = 0;
+	float temperature = NO_SENSOR_DATA;
+	boolean temperatureHasChanged = false;
+	float pressure = NO_SENSOR_DATA;
+	boolean pressureHasChanged = false;
+	float humidity = NO_SENSOR_DATA;
+	boolean humidityHasChanged = false;
+} State;
 
 #pragma region global objects
 AS_BH1750 bh1750;         // Helligkeitssensor
@@ -43,38 +62,73 @@ WiFiClient client;
 // the setup function runs once when you press reset or power the board
 void setup() {
 	Serial.begin(115200);
-	pinMode(SENSOR_POWER, OUTPUT);
-	digitalWrite(SENSOR_POWER, HIGH);
-	//bh1750.begin();
-	//bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
-	dht.begin();
-	if (WiFiStart()) {
-		MeasureAndReportData();
-	}
-#ifndef DEBUG
-	Serial.printf("Going into deep sleep for %d seconds\r\n", sleep_seconds);
-	pinMode(SENSOR_POWER, LOW);
-	ESP.deepSleep(sleep_seconds * 1e6); // 1e6 is *10^6 microseconds = secs
+#ifdef SLEEP
+	loop();
+	Serial.printf("Going into deep sleep for %d seconds\r\n", SECONDS_BETWEEN_TICKS);
+	SaveValuesToEeprom();
+	ESP.deepSleep(SECONDS_BETWEEN_TICKS * 1e6); // 1e6 is *10^6 microseconds = secs
 #endif
 	// nach dem sleep beginnt wieder setup()
 }
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-	MeasureAndReportData();
+	pinMode(SENSOR_POWER, OUTPUT);
+	digitalWrite(SENSOR_POWER, HIGH); // power up temperature sensor
+	//bh1750.begin();
+	//bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
+	dht.begin();
+	LoadValuesFromEeprom();
+	GetSensorData();
+	pinMode(SENSOR_POWER, LOW);
+	State.ticksSinceLastTransmission++;
+	boolean mustTransmit = State.ticksSinceLastTransmission > MAX_TICKS_BETWEEN_TRANSMISSION;
+
+	if (DataChanged() || mustTransmit) {
+		if (WiFiStart()) {
+			ReportData(mustTransmit);
+		}
+	}
+#ifndef SLEEP
 	delay(delay_ms);
+#endif
 }
 
-void MeasureAndReportData() {
+void GetSensorData() {
 	float value;
 	value = readTemperatureFromDHT22();
-	SendData("temperature", value);
+	if (value != State.temperature) {
+		State.temperature = value;
+		State.temperatureHasChanged = true;
+	}
+	value = readHumidity();
+	if (value != State.humidity) {
+		State.humidity = value;
+		State.humidityHasChanged = true;
+	}
 	//value = readPressure();
 	//SendData("pressure", value);
-	value = readHumidity();
-	SendData("humidity", value);
 	//value = readBrightness();
 	//SendData("brightness", value);
+}
+
+boolean DataChanged() {
+	return State.humidityHasChanged || State.pressureHasChanged || State.temperatureHasChanged;
+}
+
+void ReportData(boolean force) {
+	if ((force || State.temperatureHasChanged) && State.temperature != NO_SENSOR_DATA) {
+		SendData("temperature", State.temperature);
+		State.temperatureHasChanged = false;
+	}
+	if ((force || State.pressureHasChanged) && State.pressure != NO_SENSOR_DATA) {
+		SendData("pressure", State.pressure);
+		State.pressureHasChanged = false;
+	}
+	if ((force || State.humidityHasChanged) && State.humidity != NO_SENSOR_DATA) {
+		SendData("humidity", State.humidity);
+		State.humidityHasChanged = false;
+	}
 }
 
 void SendData(const char* type, float value) {
@@ -114,31 +168,31 @@ void SendData(const char* type, float value) {
 	client.stop();
 }
 
-	//////////////////
-	// Connect to WiFi
-	//////////////////
-	bool WiFiStart()
-	{
-		// Connect to WiFi network
-		Serial.print("Connecting to ");
-		Serial.println(WIFI_SSID);
-		WiFi.begin(WIFI_SSID, WIFI_PWD);
-		for (int retry = 0; retry < 20; retry++) {
-			if (WiFi.status() == WL_CONNECTED)
-			{
-				Serial.println("WiFi connected");
+//////////////////
+// Connect to WiFi
+//////////////////
+bool WiFiStart()
+{
+	// Connect to WiFi network
+	Serial.print("Connecting to ");
+	Serial.println(WIFI_SSID);
+	WiFi.begin(WIFI_SSID, WIFI_PWD);
+	for (int retry = 0; retry < 20; retry++) {
+		if (WiFi.status() == WL_CONNECTED)
+		{
+			Serial.println("WiFi connected");
 
-				// Start the server
-				Serial.print("Server started - IP: ");
-				Serial.println(WiFi.localIP());
-				return true;
-			}
-			Serial.print(".");
-			delay(1000);
+			// Start the server
+			Serial.print("Server started - IP: ");
+			Serial.println(WiFi.localIP());
+			return true;
 		}
-		Serial.println("No Wifi connection possible");
-		return false;
+		Serial.print(".");
+		delay(1000);
 	}
+	Serial.println("No Wifi connection possible");
+	return false;
+}
 float readTemperaturefromBMP180()
 {
 	long ut = bmp180.measureTemperature();
@@ -175,56 +229,15 @@ float readBrightness()
 	return bh1750.readLightLevel();
 }
 
-
-
-/*******************************************/
-
-uint8_t portArray[] = { 16, 5, 4, 0, 2, 14, 12, 13 };
-//String portMap[] = {"D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"}; //for Wemos
-String portMap[] = { "GPIO16", "GPIO5", "GPIO4", "GPIO0", "GPIO2", "GPIO14", "GPIO12", "GPIO13" };
-
-void scanPorts() {
-	for (uint8_t i = 0; i < sizeof(portArray); i++) {
-		for (uint8_t j = 0; j < sizeof(portArray); j++) {
-			if (i != j) {
-				Serial.print("Scanning (SDA : SCL) - " + portMap[i] + " : " + portMap[j] + " - ");
-				Wire.begin(portArray[i], portArray[j]);
-				check_if_exist_I2C();
-			}
-		}
-	}
+void LoadValuesFromEeprom()
+{
+	EEPROM.begin(sizeof(State));
+	EEPROM.get(0, State);
 }
 
-void check_if_exist_I2C() {
-	byte error, address;
-	int nDevices;
-	nDevices = 0;
-	for (address = 1; address < 127; address++) {
-		// The i2c_scanner uses the return value of
-		// the Write.endTransmisstion to see if
-		// a device did acknowledge to the address.
-		Wire.beginTransmission(address);
-		error = Wire.endTransmission();
-
-		if (error == 0) {
-			Serial.print("I2C device found at address 0x");
-			if (address < 16)
-				Serial.print("0");
-			Serial.print(address, HEX);
-			Serial.println("  !");
-
-			nDevices++;
-		}
-		else if (error == 4) {
-			Serial.print("Unknow error at address 0x");
-			if (address < 16)
-				Serial.print("0");
-			Serial.println(address, HEX);
-		}
-	} //for loop
-	if (nDevices == 0)
-		Serial.println("No I2C devices found");
-	else
-		Serial.println("**********************************\n");
-	//delay(1000);           // wait 1 seconds for next scan, did not find it necessary
+void SaveValuesToEeprom()
+{
+	EEPROM.put(0, State);
+	EEPROM.commit();
 }
+

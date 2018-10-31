@@ -3,6 +3,7 @@
 #include "WifiIdentifier.h"
 
 #include "SensorData.h"
+#include "time_ntp.h"
 
 
 // Replace with your network credentials
@@ -23,6 +24,9 @@ const char* SENSOR1_NAME = "Drau&szlig;en";
 const char* SENSOR2_NAME = "Schildkr&ouml;ten";
 SensorData sensors[3];
 
+NTP* ntp = new NTP();
+unsigned long timeOffset = 0;
+
 void setup() {
 	Serial.begin(115200);
 
@@ -31,6 +35,7 @@ void setup() {
 	sensors[2].SensorName = SENSOR2_NAME;
 	// Connect to Wi-Fi network with SSID and password
 	ConnectToWifi();
+	GetCurrentTime();
 }
 
 void loop() {
@@ -77,7 +82,7 @@ void loop() {
 								break;
 							}
 						}
-						RenderPage(client);
+						RenderPage(&client);
 						break;
 					}
 					else { // if you got a newline, then clear currentLine
@@ -182,57 +187,73 @@ void RenderDataReceived(WiFiClient client) {
 	client.println();
 }
 
-void RenderPage(WiFiClient client)
+void RenderPage(WiFiClient* client)
 {
-	client.println("HTTP/1.1 200 OK");
-	client.println("Content-type:text/html");
-	client.println("Connection: close");
-	client.println();
+	client->println("HTTP/1.1 200 OK");
+	client->println("Content-type:text/html");
+	client->println("Connection: close");
+	client->println();
 
 	// Display the HTML web page
-	client.println("<!DOCTYPE html><html>");
-	client.println("<head>");
-	client.println("<meta http-equiv='refresh' content='60'>");
-	client.println("<meta name='viewport' content='width = 640, height=960,initial - scale = 1'>");
-	client.println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
+	client->println("<!DOCTYPE html><html>");
+	client->println("<head>");
+	client->println("<meta http-equiv='refresh' content='60'>");
+	client->println("<meta name='viewport' content='width = 640, height=960,initial - scale = 1'>");
+	client->println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
 	// CSS 
-	client.println("<style>");
-	client.print("html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;} ");
-	client.print("h3 { font-size:24pt; font-weight:bold; text-align:left; align:left;} ");
-	client.print(".sensorType { font-size:24pt; font-weight:250; text-align:right; width:50 % ; padding-right:24px; }");
-	client.print(".sensorValue { font-size:24pt; font-weight:100; text-align:left; }");
-	client.println("</style>");
-	client.println("</head>");
+	client->println("<style>");
+	client->print("html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;} ");
+	client->print("h3 { font-size:24pt; font-weight:bold; text-align:left; align:left;} ");
+	client->print(".sensorType { font-size:24pt; font-weight:250; text-align:right; width:50 % ; padding-right:24px; }");
+	client->print(".sensorValue { font-size:24pt; font-weight:100; text-align:left; }");
+	client->println("</style>");
+	client->println("</head>");
 
 	// Web Page Heading
-	client.println("<body><h1>Online-Wetterstation Lessingstra&szlig;e 36</h1>");
+	client->println("<body><h1>Online-Wetterstation Lessingstra&szlig;e 36</h1>");
 
+	WriteCurrentTime(client);
+	
 	WriteSensorData(client, &sensors[0]);
 	WriteSensorData(client, &sensors[1]);
 	WriteSensorData(client, &sensors[2]);
 
-	client.println("</body></html>");
+	client->println("</body></html>");
 
 	// The HTTP response ends with another blank line
-	client.println();
+	client->println();
 }
 
-void WriteSensorData(WiFiClient client, SensorData* sensor) {
-	client.println("<h3>"); client.print(sensor->SensorName); client.print("</h3>");
-	client.print("<table width='100%'>");
+void WriteSensorData(WiFiClient* client, SensorData* sensor) {
+	client->println("<h3>"); client->print(sensor->SensorName); client->print("</h3>");
+	client->print("<table width='100%'>");
 	WriteSensorValue(client, "Temperatur", sensor->Temperature, "Grad");
 	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, "%");
 	WriteSensorValue(client, "Luftdruck", sensor->Pressure, "hPa");
 	WriteSensorValue(client, "Helligkeit", sensor->Brightness, "cd");
-	client.println("</table>");
+	client->println("</table>");
 }
 
-void WriteSensorValue(WiFiClient client, const char* description, float data, const char* suffix)
+void WriteSensorValue(WiFiClient* client, const char* description, float data, const char* suffix)
 {
 	char number_buffer[10];
 	if (data != SENSORDATA_NO_DATA) {
 		dtostrf(data, 6, 1, number_buffer);
-		client.printf("<tr><td class='sensorType'>%s</td><td class='sensorValue'>%s %s</td></tr>", description, number_buffer, suffix);
+		client->printf("<tr><td class='sensorType'>%s</td><td class='sensorValue'>%s %s</td></tr>", description, number_buffer, suffix);
 	}
 }
 
+void GetCurrentTime()
+{
+	unsigned long currentTime = ntp->GetLocalTime(); // current time in seconds since 1.1.1970
+	currentTime *= 1000; // to align with millis() call
+	timeOffset = currentTime - millis();
+}
+
+void WriteCurrentTime(WiFiClient* client)
+{
+	Serial.print("TIME: es ist ");
+	String s = ntp->GetTimeString(millis() + timeOffset);
+	client->println(ntp->GetTimeString((millis() + timeOffset)/1000));
+	Serial.print(s);
+}

@@ -39,9 +39,9 @@ public:
 
 private:
 	unsigned long sendNTPpacket(IPAddress& address);
-	String epoch_to_string(unsigned int epoch);
-	void epoch_to_date_time(date_time_t* date_time, unsigned int epoch);
-	unsigned int date_time_to_epoch(date_time_t* date_time);
+	String epoch_to_string(unsigned long epoch);
+	void epoch_to_date_time(date_time_t* date_time, unsigned long epoch);
+	unsigned long date_time_to_epoch(date_time_t* date_time);
 	int epoch_to_weekday(unsigned int epoch);
 	WiFiUDP udp;  // A UDP instance to let us send and receive packets over UDP
 	byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets

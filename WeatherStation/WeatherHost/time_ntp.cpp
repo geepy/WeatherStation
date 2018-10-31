@@ -83,14 +83,14 @@ static unsigned short days[4][12] =
 
 
 
-unsigned int NTP::date_time_to_epoch(date_time_t* date_time)
+unsigned long NTP::date_time_to_epoch(date_time_t* date_time)
 {
-	unsigned int second = date_time->second;  // 0-59
-	unsigned int minute = date_time->minute;  // 0-59
-	unsigned int hour = date_time->hour;    // 0-23
-	unsigned int day = date_time->day - 1;   // 0-30
-	unsigned int month = date_time->month - 1; // 0-11
-	unsigned int year = date_time->year;    // 0-99
+	unsigned long second = date_time->second;  // 0-59
+	unsigned long minute = date_time->minute;  // 0-59
+	unsigned long hour = date_time->hour;    // 0-23
+	unsigned long day = date_time->day - 1;   // 0-30
+	unsigned long month = date_time->month - 1; // 0-11
+	unsigned long year = date_time->year;    // 0-99
 	return (((year / 4 * (365 * 4 + 1) + days[year % 4][month] + day) * 24 + hour) * 60 + minute) * 60 + second;
 }
 
@@ -98,12 +98,15 @@ unsigned long NTP::GetTimestamp()
 {
 	unsigned long ulSecs1970;
 
+	WiFi.hostByName("pool.ntp.org", timeServer);
+	Serial.println("NTP: starting udp conversation");
 	udp.begin(ntpPort);
 	sendNTPpacket(timeServer); // send an NTP packet to a time server
 	delay(1000);    // wait to see if a reply is available
 	int cb = 0, repeat = 0;
 	while (!cb && repeat < 20)  // try for 2 sec
 	{
+		Serial.println("NTP: checking for response...");
 		cb = udp.parsePacket();
 		delay(100);
 		repeat++;
@@ -111,10 +114,12 @@ unsigned long NTP::GetTimestamp()
 
 	if (!cb)
 	{
+		Serial.println("NTP: no response - exiting");
 		ulSecs1970 = 0;
 	}
 	else
 	{
+		Serial.println("NTP: reading data from udp");
 		udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
 
 		//the timestamp starts at byte 40 of the received packet and is four bytes,
@@ -125,8 +130,12 @@ unsigned long NTP::GetTimestamp()
 		// combine the four bytes (two words) into a long integer
 		// this is NTP time (seconds since Jan 1 1900):
 		ulSecs1970 = highWord << 16 | lowWord;
+		Serial.print("NTP: raw data is ");
+		Serial.print(ulSecs1970);
+		Serial.print(", seconds sincs 1970 is ");
 		ulSecs1970 -= 2208988800UL; // go from 1900 to 1970
-	}
+		Serial.println(ulSecs1970);
+	}	
 	return(ulSecs1970);
 }
 
@@ -156,8 +165,9 @@ unsigned long NTP::sendNTPpacket(IPAddress& address)
 }
 
 
-void NTP::epoch_to_date_time(date_time_t* date_time, unsigned int epoch)
+void NTP::epoch_to_date_time(date_time_t* date_time, unsigned long epoch)
 {
+	unsigned long inputValue = epoch;
 	date_time->second = epoch % 60; epoch /= 60;
 	date_time->minute = epoch % 60; epoch /= 60;
 	date_time->hour = epoch % 24; epoch /= 24;
@@ -178,12 +188,15 @@ void NTP::epoch_to_date_time(date_time_t* date_time, unsigned int epoch)
 			break;
 	}
 
-	date_time->year = years + year;
+	date_time->year = years + year +1970;
 	date_time->month = month + 1;
 	date_time->day = epoch - days[year][month] + 1;
+	Serial.printf("NTP: transform %lu to %d . %d . %d %d : %d : %d", inputValue,
+		date_time->day, date_time->month, date_time->year, date_time->hour, date_time->minute, date_time->second);
+	Serial.println();
 }
 
-String NTP::epoch_to_string(unsigned int epoch)
+String NTP::epoch_to_string(unsigned long epoch)
 {
 	date_time_t date_time;
 	epoch_to_date_time(&date_time, epoch);
