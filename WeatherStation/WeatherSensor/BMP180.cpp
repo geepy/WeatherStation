@@ -41,12 +41,14 @@ void BMP180::init() {
 	readCalibrationData();
 }
 
+/*
 void BMP180::init(int sda, int scl) {
 	Wire.begin(sda, scl);
 	setSamplingMode(BMP180_OVERSAMPLING_STANDARD);
 	_ID = readID();
 	readCalibrationData();
 }
+*/
 
 /**
  * Read the ID of the chip.

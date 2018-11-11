@@ -20,16 +20,19 @@ const char* password = WIFI_PWD;
 const char* hostname = "Draussen";
 const char* servername = "wetterstation";
 
-const int delay_ms = 10000;
+#define delay_ms (90 * 1000)
 
-// #define DEBUG
-// #define SLEEP
+const int FULL_VOLTAGE = 2800;
+const int LOW_VOLTAGE = 2000;
+
+//#define DEBUG
+//#define SLEEP
 
 #ifdef DEBUG
 #define SECONDS_BETWEEN_TICKS 10
 #define MAX_TICKS_BETWEEN_TRANSMISSION 2
 #else
-#define SECONDS_BETWEEN_TICKS 60
+#define SECONDS_BETWEEN_TICKS 90
 #define MAX_TICKS_BETWEEN_TRANSMISSION 10
 #endif
 
@@ -46,13 +49,13 @@ struct {
 	int ticksSinceLastTransmission = 0;
 	float temperature = NO_SENSOR_DATA;
 	boolean temperatureHasChanged = false;
+#ifdef HAS_PRESSURE_SENSOR
 	float pressure = NO_SENSOR_DATA;
 	boolean pressureHasChanged = false;
+#endif
 	float humidity = NO_SENSOR_DATA;
 	boolean humidityHasChanged = false;
-	uint16_t voltage = NO_SENSOR_DATA;
-	uint16_t maxVoltage = NO_SENSOR_DATA;
-	boolean voltageHasChanged = false;
+	float voltage = NO_SENSOR_DATA;
 } State;
 
 #pragma region global objects
@@ -79,18 +82,20 @@ void setup() {
 void loop() {
 	pinMode(SENSOR_POWER, OUTPUT);
 	digitalWrite(SENSOR_POWER, HIGH); // power up temperature sensor
+	delay(1000); // wait until working
 	//bh1750.begin();
 	//bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
 	dht.begin();
 	LoadValuesFromEeprom();
 	GetSensorData();
-	pinMode(SENSOR_POWER, LOW);
+	digitalWrite(SENSOR_POWER, LOW);
 	State.ticksSinceLastTransmission++;
 	boolean mustTransmit = State.ticksSinceLastTransmission > MAX_TICKS_BETWEEN_TRANSMISSION;
 
 	if (DataChanged() || mustTransmit) {
 		if (WiFiStart()) {
-			ReportData(mustTransmit);
+			ReportData();
+			WiFiStop();
 		}
 	}
 #ifndef SLEEP
@@ -100,60 +105,83 @@ void loop() {
 
 void GetSensorData() {
 	float value;
+#ifdef DEBUG
+	char buffer[10];
+	Serial.print("reading temperature: ");
+#endif
 	value = readTemperatureFromDHT22();
 	if (value != State.temperature) {
 		State.temperature = value;
 		State.temperatureHasChanged = true;
 	}
+	delay(1000); // dont ask sensor more often than every 2 seconds
+#ifdef DEBUG
+	dtostrf(value, 5, 2, buffer);
+	Serial.println(buffer);
+	Serial.print("reading humidity: ");
+#endif
 	value = readHumidity();
 	if (value != State.humidity) {
 		State.humidity = value;
 		State.humidityHasChanged = true;
 	}
-	//value = readPressure();
-	//SendData("pressure", value);
-	//value = readBrightness();
-	//SendData("brightness", value);
+#ifdef DEBUG
+	dtostrf(value, 5, 2, buffer);
+	Serial.println(buffer);
+	Serial.print("reading Voltage: ");
+#endif
 
-	uint16_t voltage = ESP.getVcc();
-	if (voltage > State.voltage + 10) {
-		State.maxVoltage = State.voltage = voltage;
-	}
-	else if (abs(State.voltage - voltage) > 10) {
-		State.voltage = voltage;
+	value = ESP.getVcc();
+#ifdef DEBUG
+	dtostrf(value, 5, 2, buffer);
+	Serial.print(" raw:");
+	Serial.print(buffer);
+#endif
+	value += 300;
+#ifdef DEBUG
+	dtostrf(value, 5, 2, buffer);
+	Serial.print(" normalized:");
+	Serial.print(buffer);
+#endif
+	if (abs(State.voltage - value) > 10) {
+		State.voltage = value / 1000.;
 	}
 }
 
 boolean DataChanged() {
-	return State.humidityHasChanged || State.pressureHasChanged || State.temperatureHasChanged;
+	return State.humidityHasChanged 
+#ifdef HAS_PRESSURE_SENSOR
+		|| State.pressureHasChanged 
+#endif
+		|| State.temperatureHasChanged;
 }
 
-void ReportData(boolean force) {
-	if ((force || State.temperatureHasChanged) && State.temperature != NO_SENSOR_DATA) {
+void ReportData() {
+	if (State.temperature != NO_SENSOR_DATA) {
 		SendData("temperature", State.temperature);
 		State.temperatureHasChanged = false;
 	}
-	if ((force || State.pressureHasChanged) && State.pressure != NO_SENSOR_DATA) {
+#ifdef HAS_PRESSURE_SENSOR
+	if (State.pressure != NO_SENSOR_DATA) {
 		SendData("pressure", State.pressure);
 		State.pressureHasChanged = false;
 	}
-	if ((force || State.humidityHasChanged) && State.humidity != NO_SENSOR_DATA) {
+#endif
+	if (State.humidity != NO_SENSOR_DATA) {
 		SendData("humidity", State.humidity);
 		State.humidityHasChanged = false;
 	}
-	if (force) {
-		SendData("voltage", State.voltage);
-	}
+	SendData("Voltage", State.voltage);
 }
 
 void SendData(const char* type, float value) {
 	Serial.println("trying to connect");
 	for (int i = 0; i < 5; i++) {
 		if (client.connect(servername, 80)) {
-			char number_buffer[10];
+			char number_buffer[20];
 
 			Serial.println("  ...connected, send data");
-			dtostrf(value, 6, 1, number_buffer);
+			dtostrf(value, -19, 4, number_buffer);
 			String valueString = String(number_buffer);
 			valueString.trim();
 			String data = String("GET /sensordata/1/") + type + "/" + valueString + " HTTP/1.1";		Serial.println(data);
@@ -191,22 +219,25 @@ bool WiFiStart()
 	// Connect to WiFi network
 	Serial.print("Connecting to ");
 	Serial.println(WIFI_SSID);
+	WiFi.mode(WIFI_STA);
 	WiFi.begin(WIFI_SSID, WIFI_PWD);
 	for (int retry = 0; retry < 20; retry++) {
 		if (WiFi.status() == WL_CONNECTED)
 		{
-			Serial.println("WiFi connected");
-
-			// Start the server
-			Serial.print("Server started - IP: ");
+			Serial.print("WiFi connected on IP ");
 			Serial.println(WiFi.localIP());
 			return true;
 		}
 		Serial.print(".");
-		delay(1000);
+		delay(2000);
 	}
 	Serial.println("No Wifi connection possible");
 	return false;
+}
+
+void WiFiStop()
+{
+	WiFi.disconnect(true);
 }
 float readTemperaturefromBMP180()
 {

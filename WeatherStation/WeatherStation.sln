@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WeatherSensor", "WeatherSen
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WeatherSensorWifi", "WeatherSensorWifi\WeatherSensorWifi.vcxproj", "{D969BFF5-364D-49CD-A63A-FEE337BF9BF6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RadioHead", "..\..\..\..\Documents\Arduino\libraries\RadioHead\RadioHead.vcxitems", "{3B035BE8-BAB2-41A4-A698-7CAF73F27891}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SPI", "..\..\..\..\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\2.4.2\libraries\SPI\SPI.vcxitems", "{21839AEB-B04C-4517-9FFB-DF808F29ABD4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

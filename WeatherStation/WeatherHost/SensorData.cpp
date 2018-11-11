@@ -6,8 +6,9 @@ SensorData::SensorData() {
 	this->SensorName = SENSOR_DEFAULT_NAME;
 	this->Brightness =
 		this->Humidity =
-		this->Pressure = 
-		this->Temperature = SENSORDATA_NO_DATA;
+		this->Pressure =
+		this->Temperature =
+		this->Voltage = SENSORDATA_NO_DATA;
 }
 
 void SensorData::WriteToSerial() {
@@ -27,6 +28,9 @@ void SensorData::WriteToSerial() {
 	Serial.print(number_buffer);
 	Serial.print("Brightness=");
 	dtostrf(this->Brightness, 6, 1, number_buffer);
+	Serial.print(number_buffer);
+	Serial.print("Voltage=");
+	dtostrf(this->Voltage, 6, 1, number_buffer);
 	Serial.print(number_buffer);
 	Serial.println();
 }

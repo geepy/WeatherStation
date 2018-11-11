@@ -15,6 +15,7 @@ class SensorData
 	 float Pressure;
 	 float Brightness;
 	 float Humidity;
+	 float Voltage;
 
 	 SensorData();
 	 void WriteToSerial();

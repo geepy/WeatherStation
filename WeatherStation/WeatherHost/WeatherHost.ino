@@ -1,4 +1,6 @@
 // Load Wi-Fi library
+#include <SPI.h>
+#include <RH_ASK.h>
 #include <ESP8266WiFi.h>
 #include "WifiIdentifier.h"
 
@@ -27,6 +29,9 @@ SensorData sensors[3];
 NTP* ntp = new NTP();
 unsigned long timeOffset = 0;
 
+// init for 5kBaud and RX on pin 4
+RH_ASK driver(5000, D6, D7, 0);
+
 void setup() {
 	Serial.begin(115200);
 
@@ -34,6 +39,8 @@ void setup() {
 	sensors[1].SensorName = SENSOR1_NAME;
 	sensors[2].SensorName = SENSOR2_NAME;
 	// Connect to Wi-Fi network with SSID and password
+	if (!driver.init())
+		Serial.println("init of RF receiver failed");
 	ConnectToWifi();
 	GetCurrentTime();
 }
@@ -62,7 +69,7 @@ void loop() {
 					if (!hasUri) {
 						method = header.substring(0, header.indexOf(" "));
 						stem = header.substring(method.length() + 1, header.indexOf(" ", method.length() + 1));
-						hasUri = true;			
+						hasUri = true;
 					}
 					// if the current line is blank, you got two newline characters in a row.
 					// that's the end of the client HTTP request, so send a response:
@@ -101,6 +108,40 @@ void loop() {
 		client.stop();
 		Serial.println("Client disconnected.");
 		Serial.println("");
+	}
+	uint8_t buf[RH_ASK_MAX_MESSAGE_LEN];
+	uint8_t buflen = sizeof(buf);
+
+	if (driver.recv(buf, &buflen)) // Non-blocking
+	{
+		buf[buflen] = 0;
+		char sensorType = buf[2];
+		driver.printBuffer("raw serial data:", buf, buflen);
+		if (buf[1] == ':' && buf[3] == ':') {
+			int sensorId = buf[0] - '0';
+			if (sensorId < 0 || sensorId > 2) {
+				Serial.println("..illegal sensor id");
+			}
+			else {
+				sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+				String sensorData = String((char*)(buf + 4));
+				float sensorValue = sensorData.toFloat();
+				Serial.printf("got serial data from sensor %d of type %c with value ", sensorId, sensorType);
+				dtostrf(sensorValue, 8, 1, (char*)buf);
+				Serial.println((char*)buf);
+				switch (sensorType) {
+				case 'V':
+					sensors[sensorId].Voltage = sensorValue;
+					break;
+				case 'T':
+					sensors[sensorId].Temperature = sensorValue;
+					break;
+				case 'H':
+					sensors[sensorId].Humidity = sensorValue;
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -145,7 +186,7 @@ bool ProcessSensorData(String uri)
 		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else if (sensorType.indexOf("press") == 0) {
-		sensors[sensorId].Pressure = sensorValue;
+		sensors[sensorId].Pressure = sensorValue > 500 ? sensorValue : SENSORDATA_NO_DATA;
 		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else if (sensorType.indexOf("humid") == 0) {
@@ -154,6 +195,10 @@ bool ProcessSensorData(String uri)
 	}
 	else if (sensorType.indexOf("bright") == 0) {
 		sensors[sensorId].Brightness = sensorValue;
+		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+	}
+	else if (sensorType.indexOf("volt") == 0) {
+		sensors[sensorId].Voltage = sensorValue;
 		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
 	}
 	else {
@@ -221,10 +266,10 @@ void RenderPage(WiFiClient* client)
 	client->println("<body><h1>Online-Wetterstation Lessingstra&szlig;e 36</h1>");
 
 	WriteCurrentTime(client);
-	
-	WriteSensorData(client, &sensors[0]);
+
+	// WriteSensorData(client, &sensors[0]);
 	WriteSensorData(client, &sensors[1]);
-	WriteSensorData(client, &sensors[2]);
+	// WriteSensorData(client, &sensors[2]);
 
 	client->println("</body></html>");
 
@@ -235,20 +280,26 @@ void RenderPage(WiFiClient* client)
 void WriteSensorData(WiFiClient* client, SensorData* sensor) {
 	client->println("<h3>"); client->print(sensor->SensorName); client->print("</h3>");
 	client->print("<table width='100%'>");
-	WriteSensorValue(client, "Temperatur", sensor->Temperature, "Grad");
-	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, "%");
-	WriteSensorValue(client, "Luftdruck", sensor->Pressure, "hPa");
-	WriteSensorValue(client, "Helligkeit", sensor->Brightness, "cd");
+	WriteSensorValue(client, "Temperatur", sensor->Temperature, 1, "Grad");
+	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, 0, "%");
+	WriteSensorValue(client, "Luftdruck", sensor->Pressure, 0, "hPa");
+	WriteSensorValue(client, "Helligkeit", sensor->Brightness, 0, "cd");
+	WriteSensorValue(client, "Spannung", sensor->Voltage, 2, "%");
 	String lastTime = ntp->GetTimeString(sensor->timestamp);
 	client->printf("<tr><td>Letzter Kontakt</td><td>%s</td</tr>", lastTime.c_str());
 	client->println("</table>");
 }
 
-void WriteSensorValue(WiFiClient* client, const char* description, float data, const char* suffix)
+void WriteSensorValue(WiFiClient* client, const char* description, float data, int precision, const char* suffix)
 {
 	char number_buffer[10];
 	if (data != SENSORDATA_NO_DATA) {
-		dtostrf(data, 6, 1, number_buffer);
+		dtostrf(data, 6, precision, number_buffer);
+		for (int i = 0; i < sizeof(number_buffer); i++) {
+			if (number_buffer[i] == '.') { 
+				number_buffer[i] = ','; 
+			}
+		}
 		client->printf("<tr><td class='sensorType'>%s</td><td class='sensorValue'>%s %s</td></tr>", description, number_buffer, suffix);
 	}
 }
@@ -256,14 +307,14 @@ void WriteSensorValue(WiFiClient* client, const char* description, float data, c
 void GetCurrentTime()
 {
 	unsigned long currentTime = ntp->GetLocalTime(); // current time in seconds since 1.1.1970
-	timeOffset = currentTime - (millis()/1000);
+	timeOffset = currentTime - (millis() / 1000);
 	Serial.printf("current epoch is %ld, millis is %ld, offset is %ld\n", currentTime, millis(), timeOffset);
 }
 
 void WriteCurrentTime(WiFiClient* client)
 {
 	Serial.print("TIME: es ist ");
-	unsigned long epoch = millis()/1000 + timeOffset;
+	unsigned long epoch = millis() / 1000 + timeOffset;
 	Serial.print(epoch);
 	Serial.print(" -> ");
 	String s = ntp->GetTimeString(epoch);
