@@ -4,6 +4,8 @@
  Author:	Günter
 */
 
+#include <SPI.h>
+#include <BME280I2C.h>
 #include <Wire.h>         // i²c-Schnittstelle
 #include <EEPROM.h>		  // non-volatile memory
 #include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
@@ -25,14 +27,16 @@ const char* servername = "wetterstation";
 const int FULL_VOLTAGE = 2800;
 const int LOW_VOLTAGE = 2000;
 
-//#define DEBUG
-//#define SLEEP
+#define LOG
+#define DEBUG
+#define SLEEP
+#define HAS_PRESSURE_SENSOR
 
 #ifdef DEBUG
 #define SECONDS_BETWEEN_TICKS 10
 #define MAX_TICKS_BETWEEN_TRANSMISSION 2
 #else
-#define SECONDS_BETWEEN_TICKS 90
+#define SECONDS_BETWEEN_TICKS 120
 #define MAX_TICKS_BETWEEN_TRANSMISSION 10
 #endif
 
@@ -60,18 +64,33 @@ struct {
 
 #pragma region global objects
 AS_BH1750 bh1750;         // Helligkeitssensor
-BMP180 bmp180;            // Temperatur- und Druck-Sensor
+BME280I2C::Settings sensorSettings;
+BME280I2C bme280(sensorSettings);            // Temperatur- und Druck-Sensor
+BMP180 bmp180;
 DHT dht(D7, DHT22);        // Temperatur- und Feuchte-Sensor
 WiFiClient client;
+IPAddress myIp(192, 168, 178, 25);
+IPAddress subnetMaskIp(255,255,255,0);
+IPAddress gatewayIp(192, 168, 178, 1);
+IPAddress hostIp(192, 168, 178, 27); 
 ADC_MODE(ADC_VCC);//Set the ADCC to read supply voltage.
 #pragma endregion
 
 // the setup function runs once when you press reset or power the board
 void setup() {
+#ifdef LOG
 	Serial.begin(115200);
+#endif
+	Wire.begin(D2, D1);
 #ifdef SLEEP
+	digitalWrite(LED_BUILTIN, HIGH);
 	loop();
+	digitalWrite(LED_BUILTIN, LOW);
+#ifdef LOG
 	Serial.printf("Going into deep sleep for %d seconds\r\n", SECONDS_BETWEEN_TICKS);
+	Serial.flush();
+	Serial.end();
+#endif
 	SaveValuesToEeprom();
 	ESP.deepSleep(SECONDS_BETWEEN_TICKS * 1e6); // 1e6 is *10^6 microseconds = secs
 #endif
@@ -105,11 +124,23 @@ void loop() {
 
 void GetSensorData() {
 	float value;
+	if (!bme280.begin()) {
+#ifdef DEBUG
+		Serial.println("cannot initialize BME280.");
+#endif
+	}
+	else {
+#ifdef DEBUG
+		Serial.print("found chip, it is ");
+		Serial.println((int)bme280.chipID());
+#endif
+	}
+
 #ifdef DEBUG
 	char buffer[10];
 	Serial.print("reading temperature: ");
 #endif
-	value = readTemperatureFromDHT22();
+	value = readTemperaturefromBME280();
 	if (value != State.temperature) {
 		State.temperature = value;
 		State.temperatureHasChanged = true;
@@ -120,10 +151,20 @@ void GetSensorData() {
 	Serial.println(buffer);
 	Serial.print("reading humidity: ");
 #endif
-	value = readHumidity();
+	value = readHumidityfromBME280();
 	if (value != State.humidity) {
 		State.humidity = value;
 		State.humidityHasChanged = true;
+	}
+#ifdef DEBUG
+	dtostrf(value, 5, 2, buffer);
+	Serial.println(buffer);
+	Serial.print("reading pressure: ");
+#endif
+	value = readPressurefromBME280();
+	if (value != State.pressure) {
+		State.pressure = value;
+		State.pressureHasChanged = true;
 	}
 #ifdef DEBUG
 	dtostrf(value, 5, 2, buffer);
@@ -137,7 +178,8 @@ void GetSensorData() {
 	Serial.print(" raw:");
 	Serial.print(buffer);
 #endif
-	value += 300;
+	// value += 300; // NodeMCU Amica
+	value += 230; // LOLIN D1 mini
 #ifdef DEBUG
 	dtostrf(value, 5, 2, buffer);
 	Serial.print(" normalized:");
@@ -177,7 +219,7 @@ void ReportData() {
 void SendData(const char* type, float value) {
 	Serial.println("trying to connect");
 	for (int i = 0; i < 5; i++) {
-		if (client.connect(servername, 80)) {
+		if (client.connect(hostIp, 80)) {
 			char number_buffer[20];
 
 			Serial.println("  ...connected, send data");
@@ -220,6 +262,7 @@ bool WiFiStart()
 	Serial.print("Connecting to ");
 	Serial.println(WIFI_SSID);
 	WiFi.mode(WIFI_STA);
+	WiFi.config(myIp, gatewayIp, subnetMaskIp);
 	WiFi.begin(WIFI_SSID, WIFI_PWD);
 	for (int retry = 0; retry < 20; retry++) {
 		if (WiFi.status() == WL_CONNECTED)
@@ -246,11 +289,16 @@ float readTemperaturefromBMP180()
 	return bmp180.formatTemperature(t);
 }
 
+float readTemperaturefromBME280()
+{
+	return bme280.temp();
+}
+
 float readTemperatureFromDHT22() {
 	return dht.readTemperature();
 }
 
-float readPressure()
+float readPressurefromBMP180()
 {
 	byte samplingMode = BMP180_OVERSAMPLING_HIGH_RESOLUTION;
 	long up;
@@ -265,11 +313,20 @@ float readPressure()
 	return bmp180.formatPressure(p);
 }
 
-float readHumidity()
+float readPressurefromBME280()
+{
+	return bme280.pres()/100.;
+}
+
+float readHumidityfromDHT()
 {
 	return dht.readHumidity();
 }
 
+float readHumidityfromBME280()
+{
+	bme280.hum();
+}
 float readBrightness()
 {
 	return bh1750.readLightLevel();

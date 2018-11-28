@@ -1,6 +1,8 @@
+#include <gfxfont.h>
 #include <SPI.h>
 #include <RH_ASK.h>		  // für Funkübertragung
 #include <Wire.h>         // i²c-Schnittstelle
+#include "LowPower.h"     // deep sleep mode
 #include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
 #include "dht.h"	      // patched Temperatur-/Feuchtigkeit-Sensor
 #include <AS_BH1750.h>    // Helligkeitssensor
@@ -22,7 +24,7 @@ AS_BH1750 bh1750;         // Helligkeitssensor
 #define SENSORID 1
 
 DHT dht(DHT_DATAPIN, DHT22);        // Temperatur- und Feuchte-Sensor
-RH_ASK driver(5000, 0, WIRE_DATAPIN, 0);
+RH_ASK driver(2000, 0, WIRE_DATAPIN, 0);
 
 long delay_ms = 100;
 long delay_sensor = 2000;
@@ -45,7 +47,7 @@ float values[3][5];
 bool transmitDataNow;
 
 void setup() {
-	Serial.begin(115200);
+	Serial.begin(57600);
 	counter = 4711;
 	pinMode(LEDPIN, OUTPUT);
 	pinMode(3, INPUT_PULLUP);
@@ -74,63 +76,31 @@ void loop() {
 	char *msg;
 	char number_buffer[20];
 	long l = 0;
-	float f = 0;
+	float f = 0, f2=0;
 
-	checkButton();
-	if (millis() - lastSensorCheck < delay_sensor)
-	{
-		return;
-	}
-	lastSensorCheck += delay_sensor; // don't slide
-	cycle++; // nächster Sensor
-	switch (cycle)
-	{
-	case 0: // Temperatur von BMP180
-		break;
-		f = readTemperature();
-		setValue(TEMPERATURE, f / 10);
-		break;
-
-	case 1: // Luftdruck von BMP180
-		break;
-		l = readPressure();
-		setValue(PRESSURE, bmp180.formatPressure(l));
-		break;
-
-	case 2: // Luftfeuchtigkeit von DHT22
-		digitalWrite(DHT_POWERPIN, HIGH);
+		 // DHT22
+		digitalWrite(DHT_POWERPIN, HIGH); // power to DHT and RF
 		delay(500); // spin up sensor
 		f = dht.readHumidity();
-		digitalWrite(DHT_POWERPIN, LOW); // shut down sensor
+		delay(2000); // only one measure each 2 seconds
+		f2 = dht.readTemperature();
 		setValue(HUMIDITY, f);
-		break;
-
-	case 3: // Temperatur von DHT22
-		digitalWrite(DHT_POWERPIN, HIGH);
-		delay(500); // spin up sensor
-		f = dht.readTemperature();
-		digitalWrite(DHT_POWERPIN, LOW);
-		setValue(TEMPERATURE, f);
-		break;
-
-	case 4: // Helligkeit von BH1750
-		break;
-		f = readLightLevel();
-		setValue(BRIGHTNESS, f);
-		break;
-
-	case 5: // eigene Spannung
+		setValue(TEMPERATURE, f2);
+		
+		// eigene Spannung
 		f = readVoltage();
 		setValue(VOLTAGE, f);
-		break;
 
-	default: // am Ende angekommen: Zähler zurücksetzen
-		transmitMessage("I:nix neues");
-		cycle = -1;
-		break;
+		// digitalWrite(DHT_POWERPIN, LOW); // shut down sensor & RF
+		
+										 // refreshDisplay(displayPage);
+	Serial.print("going to sleep");
+	Serial.flush();
+	for (int cnt = 0; cnt < 7; cnt++) {
+		// LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+		delay(100);
 	}
-	refreshDisplay(displayPage);
-	delay(delay_ms);  // Eine Sekunde Pause, danach startet der Sketch von vorne
+	Serial.println(" - waking up");
 }
 
 void test()
@@ -173,7 +143,7 @@ int readTemperature()
 	return t;
 }
 
-long readPressure()
+long readPressurefromBMP180()
 {
 	byte samplingMode = BMP180_OVERSAMPLING_HIGH_RESOLUTION;
 	long up;
@@ -216,9 +186,10 @@ float readVoltage() {
 	long result = (high << 8) | low;
 	Serial.print("voltage raw data is ");
 	Serial.println(result);
-	result = 1230000L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+	result = 1105500L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
 	return result / 1000.; // Vcc in millivolts
 }
+
 void initDisplay()
 {
 	sh1106_128x64_i2c_init();

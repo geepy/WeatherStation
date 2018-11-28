@@ -13,9 +13,30 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WeatherSensorWifi", "Weathe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RadioHead", "..\..\..\..\Documents\Arduino\libraries\RadioHead\RadioHead.vcxitems", "{3B035BE8-BAB2-41A4-A698-7CAF73F27891}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Adafruit_SSD1306", "..\..\..\..\Documents\Arduino\libraries\Adafruit_SSD1306\Adafruit_SSD1306.vcxitems", "{707CDEA1-547B-42F4-B3E8-5EABD543E16E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Adafruit_GFX_Library", "..\..\..\..\Documents\Arduino\libraries\Adafruit_GFX_Library\Adafruit_GFX_Library.vcxitems", "{8A4405AC-5B96-45E8-A520-CD4F874A7BE3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "epaperHost", "..\..\..\..\Documents\Arduino\epaperHost\epaperHost.vcxproj", "{FBD7F87A-43C9-4E62-A37F-5045BA176E68}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GxEPD_Example", "..\..\..\..\Documents\Arduino\libraries\GxEPD-master\examples\GxEPD_Example\GxEPD_Example.vcxproj", "{757B5097-0AF9-4117-ACFD-7E75A4051070}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BME280", "..\..\..\..\Documents\Arduino\libraries\BME280\BME280.vcxitems", "{A726355F-B13E-48B1-8A35-CE64DD490F83}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{EA67A87B-F27E-46EF-8E26-A0C58AF41E42}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SPI", "..\..\..\..\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\2.4.2\libraries\SPI\SPI.vcxitems", "{21839AEB-B04C-4517-9FFB-DF808F29ABD4}"
 EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		..\..\..\..\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\2.4.2\libraries\SPI\SPI.vcxitems*{21839aeb-b04c-4517-9ffb-df808f29abd4}*SharedItemsImports = 9
+		..\..\..\..\Documents\Arduino\libraries\RadioHead\RadioHead.vcxitems*{3b035be8-bab2-41a4-a698-7caf73f27891}*SharedItemsImports = 9
+		..\..\..\..\Documents\Arduino\libraries\Adafruit_SSD1306\Adafruit_SSD1306.vcxitems*{707cdea1-547b-42f4-b3e8-5eabd543e16e}*SharedItemsImports = 9
+		..\..\..\..\Documents\Arduino\libraries\Adafruit_GFX_Library\Adafruit_GFX_Library.vcxitems*{8a4405ac-5b96-45e8-a520-cd4f874a7be3}*SharedItemsImports = 9
+		..\..\..\..\Documents\Arduino\libraries\BME280\BME280.vcxitems*{a726355f-b13e-48b1-8a35-ce64dd490f83}*SharedItemsImports = 9
+		..\..\..\..\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\2.4.2\libraries\SPI\SPI.vcxitems*{d969bff5-364d-49cd-a63a-fee337bf9bf6}*SharedItemsImports = 4
+		..\..\..\..\Documents\Arduino\libraries\BME280\BME280.vcxitems*{d969bff5-364d-49cd-a63a-fee337bf9bf6}*SharedItemsImports = 4
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -49,9 +70,27 @@ Global
 		{D969BFF5-364D-49CD-A63A-FEE337BF9BF6}.Release|x64.ActiveCfg = Release|Win32
 		{D969BFF5-364D-49CD-A63A-FEE337BF9BF6}.Release|x86.ActiveCfg = Release|Win32
 		{D969BFF5-364D-49CD-A63A-FEE337BF9BF6}.Release|x86.Build.0 = Release|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Debug|x64.ActiveCfg = Debug|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Debug|x86.ActiveCfg = Debug|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Debug|x86.Build.0 = Debug|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Release|x64.ActiveCfg = Release|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Release|x86.ActiveCfg = Release|Win32
+		{FBD7F87A-43C9-4E62-A37F-5045BA176E68}.Release|x86.Build.0 = Release|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Debug|x64.ActiveCfg = Debug|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Debug|x86.ActiveCfg = Debug|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Debug|x86.Build.0 = Debug|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Release|x64.ActiveCfg = Release|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Release|x86.ActiveCfg = Release|Win32
+		{757B5097-0AF9-4117-ACFD-7E75A4051070}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3B035BE8-BAB2-41A4-A698-7CAF73F27891} = {EA67A87B-F27E-46EF-8E26-A0C58AF41E42}
+		{707CDEA1-547B-42F4-B3E8-5EABD543E16E} = {EA67A87B-F27E-46EF-8E26-A0C58AF41E42}
+		{8A4405AC-5B96-45E8-A520-CD4F874A7BE3} = {EA67A87B-F27E-46EF-8E26-A0C58AF41E42}
+		{A726355F-B13E-48B1-8A35-CE64DD490F83} = {EA67A87B-F27E-46EF-8E26-A0C58AF41E42}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1C0EDC1B-27EF-41DB-8002-1FF563B8B52E}

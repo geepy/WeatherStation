@@ -30,7 +30,7 @@ NTP* ntp = new NTP();
 unsigned long timeOffset = 0;
 
 // init for 5kBaud and RX on pin 4
-RH_ASK driver(5000, D6, D7, 0);
+RH_ASK driver(2000, D6, D7, 0);
 
 void setup() {
 	Serial.begin(115200);
@@ -284,7 +284,7 @@ void WriteSensorData(WiFiClient* client, SensorData* sensor) {
 	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, 0, "%");
 	WriteSensorValue(client, "Luftdruck", sensor->Pressure, 0, "hPa");
 	WriteSensorValue(client, "Helligkeit", sensor->Brightness, 0, "cd");
-	WriteSensorValue(client, "Spannung", sensor->Voltage, 2, "%");
+	WriteSensorValue(client, "Spannung", sensor->Voltage, 2, "V");
 	String lastTime = ntp->GetTimeString(sensor->timestamp);
 	client->printf("<tr><td>Letzter Kontakt</td><td>%s</td</tr>", lastTime.c_str());
 	client->println("</table>");
