@@ -3,6 +3,12 @@
 
 #define SENSORDATA_NO_DATA -1000.
 
+#define SENSORTYPE_TEMPERATURE 0
+#define SENSORTYPE_PRESSURE 1
+#define SENSORTYPE_HUMIDITY 2
+#define SENSORTYPE_VOLTAGE 3
+#define SENSORTYPE_BRIGHTNESS 4
+#define NUM_SENSORTYPES 5
 class SensorData
 {
  protected:
@@ -11,11 +17,7 @@ class SensorData
  public:
 	 const char* SensorName;
 	 unsigned long timestamp;
-	 float Temperature;
-	 float Pressure;
-	 float Brightness;
-	 float Humidity;
-	 float Voltage;
+	 float Value[NUM_SENSORTYPES];
 
 	 SensorData();
 	 void WriteToSerial();

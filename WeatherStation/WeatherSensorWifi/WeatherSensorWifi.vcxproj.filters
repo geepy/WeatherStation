@@ -30,12 +30,18 @@
     <ClInclude Include="DHT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BME280.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BMP180.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DHT.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BME280.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

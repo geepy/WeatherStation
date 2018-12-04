@@ -34,8 +34,6 @@ Global
 		..\..\..\..\Documents\Arduino\libraries\Adafruit_SSD1306\Adafruit_SSD1306.vcxitems*{707cdea1-547b-42f4-b3e8-5eabd543e16e}*SharedItemsImports = 9
 		..\..\..\..\Documents\Arduino\libraries\Adafruit_GFX_Library\Adafruit_GFX_Library.vcxitems*{8a4405ac-5b96-45e8-a520-cd4f874a7be3}*SharedItemsImports = 9
 		..\..\..\..\Documents\Arduino\libraries\BME280\BME280.vcxitems*{a726355f-b13e-48b1-8a35-ce64dd490f83}*SharedItemsImports = 9
-		..\..\..\..\AppData\Local\arduino15\packages\esp8266\hardware\esp8266\2.4.2\libraries\SPI\SPI.vcxitems*{d969bff5-364d-49cd-a63a-fee337bf9bf6}*SharedItemsImports = 4
-		..\..\..\..\Documents\Arduino\libraries\BME280\BME280.vcxitems*{d969bff5-364d-49cd-a63a-fee337bf9bf6}*SharedItemsImports = 4
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

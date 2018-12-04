@@ -19,11 +19,23 @@ WiFiServer server(80);
 // Variable to store the HTTP request
 String header;
 
-const char* SENSORDATA_HEADER = "/sensordata/";
+struct UriData {
+	int sensorId;
+	int sensorType;
+	float sensorValue;
+};
+
+// forward declarations
+bool ProcessSensorData(UriData& data);
+void ProcessSerialSensorData(const unsigned char* buf);
+void RenderSensorData(WiFiClient client, UriData& data);
+bool ParseUri(String& uri, UriData& result);
+
+const char* SENSORDATA_HEADER = "sensordata";
 // storage
-const char* SENSOR0_NAME = "Drinnen";
-const char* SENSOR1_NAME = "Drau&szlig;en";
-const char* SENSOR2_NAME = "Schildkr&ouml;ten";
+#define SENSOR0_NAME "Drinnen"
+#define SENSOR1_NAME "Drau&szlig;en"
+#define SENSOR2_NAME "Schildkr&ouml;ten"
 SensorData sensors[3];
 
 NTP* ntp = new NTP();
@@ -74,20 +86,22 @@ void loop() {
 					// if the current line is blank, you got two newline characters in a row.
 					// that's the end of the client HTTP request, so send a response:
 					if (currentLine.length() == 0) {
-						stem.toLowerCase();
+						UriData data;
+						if (ParseUri(stem, data)) {
+							if (method == "PUT") {
 
-						if (stem.indexOf(SENSORDATA_HEADER) >= 0) {
-							Serial.print("receiving sensor data: ");
-							Serial.println(stem);
-							if (!ProcessSensorData(stem.substring(strlen(SENSORDATA_HEADER))))
-							{
-								client.println("HTTP/1.1 500 BAD URI");
-								break;
+								if (!ProcessSensorData(data))
+								{
+									client.println("HTTP/1.1 500 BAD URI");
+								}
+								else {
+									RenderDataReceived(client);
+								}
 							}
 							else {
-								RenderDataReceived(client);
-								break;
+								RenderSensorData(client, data);
 							}
+							break;
 						}
 						RenderPage(&client);
 						break;
@@ -115,100 +129,120 @@ void loop() {
 	if (driver.recv(buf, &buflen)) // Non-blocking
 	{
 		buf[buflen] = 0;
-		char sensorType = buf[2];
 		driver.printBuffer("raw serial data:", buf, buflen);
-		if (buf[1] == ':' && buf[3] == ':') {
-			int sensorId = buf[0] - '0';
-			if (sensorId < 0 || sensorId > 2) {
-				Serial.println("..illegal sensor id");
-			}
-			else {
-				sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
-				String sensorData = String((char*)(buf + 4));
-				float sensorValue = sensorData.toFloat();
-				Serial.printf("got serial data from sensor %d of type %c with value ", sensorId, sensorType);
-				dtostrf(sensorValue, 8, 1, (char*)buf);
-				Serial.println((char*)buf);
-				switch (sensorType) {
-				case 'V':
-					sensors[sensorId].Voltage = sensorValue;
-					break;
-				case 'T':
-					sensors[sensorId].Temperature = sensorValue;
-					break;
-				case 'H':
-					sensors[sensorId].Humidity = sensorValue;
-					break;
-				}
-			}
-		}
+		ProcessSerialSensorData(buf);
 	}
 }
 
-bool ProcessSensorData(String uri)
-{
-	Serial.print("..processing sensor data ");
-	Serial.println(uri);
-	int offset = uri.indexOf("/");
+bool ParseUri(String& uri, UriData& result) {
+	uri.toLowerCase();
+	if (uri.indexOf(SENSORDATA_HEADER) < 0) {
+		Serial.println("no sensor data");
+		return false;
+	}
+	// /SENSORDATA/
+	int offset = uri.indexOf("/", 1) + 1; // don't count leading '/'
 	if (offset < 1) {
 		Serial.println("..illegal stem");
 		return false;
 	}
+	// /SENSORDATA/{nameOrId}/
+	int nextOffset = uri.indexOf("/", offset) + 1;
 	int sensorId = 0;
-	if (offset == 1) {
-		sensorId = uri[0] - '0';
+	if (nextOffset == offset + 2) {
+		result.sensorId = uri[offset] - '0';
 	}
 	// else search for sensorName and optionally create an index for it
 	else {
 		Serial.println("..symbolic sensor name not supported yet");
 		return false;
 	}
-	if (sensorId < 0 || sensorId > 2) {
+	if (sensorId < 0 || sensorId > 3) {
 		Serial.println("..illegal sensor id");
 		return false;
 	}
-	uri = uri.substring(offset + 1);
-	offset = uri.indexOf("/");
+	offset = nextOffset;
+	// /SENSORDATA/{nameOrId}/{type}/
+	nextOffset = uri.indexOf("/", offset) + 1;
 	if (offset < 1) {
 		Serial.println("..sensor type not found");
 		return false;
 	}
-	String sensorType = uri.substring(0, offset);
+	if (nextOffset < 1) {
+		nextOffset = uri.length();
+	}
+	String sensorType = uri.substring(offset, nextOffset - 1);
 	Serial.print("..found sensor type ");
 	Serial.println(sensorType);
-	uri = uri.substring(offset + 1);
-	float sensorValue = uri.toFloat();
-	if (uri == "nan") {
-		// ignore, keep last value
+	if (sensorType.startsWith("temp"))
+	{
+		result.sensorType = SENSORTYPE_TEMPERATURE;
 	}
-	else if (sensorType.indexOf("temp") == 0) {
-		sensors[sensorId].Temperature = sensorValue;
-		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+	else if (sensorType.startsWith("press")) {
+		result.sensorType = SENSORTYPE_PRESSURE;
 	}
-	else if (sensorType.indexOf("press") == 0) {
-		sensors[sensorId].Pressure = sensorValue > 500 ? sensorValue : SENSORDATA_NO_DATA;
-		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+	else if (sensorType.startsWith("hum")) {
+		result.sensorType = SENSORTYPE_HUMIDITY;
 	}
-	else if (sensorType.indexOf("humid") == 0) {
-		sensors[sensorId].Humidity = sensorValue;
-		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+	else if (sensorType.startsWith("bright")) {
+		result.sensorType = SENSORTYPE_BRIGHTNESS;
 	}
-	else if (sensorType.indexOf("bright") == 0) {
-		sensors[sensorId].Brightness = sensorValue;
-		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
-	}
-	else if (sensorType.indexOf("volt") == 0) {
-		sensors[sensorId].Voltage = sensorValue;
-		sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+	else if (sensorType.startsWith("volt")) {
+		result.sensorType = SENSORTYPE_VOLTAGE;
 	}
 	else {
-		Serial.print("..unsupported sensor type: ");
-		Serial.println(sensorType);
+		Serial.printf("unknown sensor type '%s'\n", sensorType.c_str());
 		return false;
 	}
-	sensors[sensorId].WriteToSerial();
+	if (uri.length() > nextOffset && !uri.endsWith("nan")) {
+		result.sensorValue = uri.substring(nextOffset).toFloat();
+	}
+	else {
+		result.sensorValue = NAN;
+	}
 	return true;
 }
+
+bool ProcessSensorData(UriData& data)
+{
+	if (data.sensorValue > (data.sensorType == SENSORTYPE_PRESSURE ? 1500 : 110) || data.sensorValue < -50) {
+		data.sensorValue = SENSORDATA_NO_DATA;
+	}
+	sensors[data.sensorId].Value[data.sensorType] = data.sensorValue;
+	sensors[data.sensorId].timestamp = millis() / 1000 + timeOffset;
+	sensors[data.sensorId].WriteToSerial();
+	return true;
+}
+
+void ProcessSerialSensorData(const unsigned char* buf) {
+	char sensorType = buf[2];
+	if (buf[1] == ':' && buf[3] == ':') {
+		int sensorId = buf[0] - '0';
+		if (sensorId < 0 || sensorId > 2) {
+			Serial.println("..illegal sensor id");
+		}
+		else {
+			sensors[sensorId].timestamp = millis() / 1000 + timeOffset;
+			String sensorData = String((char*)(buf + 4));
+			float sensorValue = sensorData.toFloat();
+			Serial.printf("got serial data from sensor %d of type %c with value ", sensorId, sensorType);
+			dtostrf(sensorValue, 8, 1, (char*)buf);
+			Serial.println((char*)buf);
+			switch (sensorType) {
+			case 'V':
+				sensors[sensorId].Value[SENSORTYPE_VOLTAGE] = sensorValue;
+				break;
+			case 'T':
+				sensors[sensorId].Value[SENSORTYPE_TEMPERATURE] = sensorValue;
+				break;
+			case 'H':
+				sensors[sensorId].Value[SENSORTYPE_HUMIDITY] = sensorValue;
+				break;
+			}
+		}
+	}
+}
+
 
 void ConnectToWifi()
 {
@@ -227,6 +261,17 @@ void ConnectToWifi()
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
 	server.begin();
+}
+
+
+
+void RenderSensorData(WiFiClient client, UriData& data) {
+	client.println("HTTP/1.1 200 OK");
+	client.println("Content-type:text/plain");
+	client.println("Connection: close");
+	client.println();
+	client.println(String(sensors[data.sensorId].Value[data.sensorType], 1));
+	client.println();
 }
 
 void RenderDataReceived(WiFiClient client) {
@@ -257,8 +302,13 @@ void RenderPage(WiFiClient* client)
 	client->println("<style>");
 	client->print("html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;} ");
 	client->print("h3 { font-size:24pt; font-weight:bold; text-align:left; align:left;} ");
-	client->print(".sensorType { font-size:24pt; font-weight:250; text-align:right; width:50 % ; padding-right:24px; }");
-	client->print(".sensorValue { font-size:24pt; font-weight:100; text-align:left; }");
+	client->print(".sensorReadings { font-size:24pt; font-weight:250; width:50 % ; padding-right:12px; padding-left:12px; }");
+	client->print(".sensor { background-color:#f8f8f8; }");
+	client->print(".smaller { font-size:18pt; }");
+	client->print(".footnote { font-size:12pt; }");
+	client->print(".left { text-align:right; }");
+	client->print(".right { text-align:left; }");
+	client->print(".footnote { font-size:12pt; }");
 	client->println("</style>");
 	client->println("</head>");
 
@@ -267,9 +317,9 @@ void RenderPage(WiFiClient* client)
 
 	WriteCurrentTime(client);
 
-	// WriteSensorData(client, &sensors[0]);
+	WriteSensorData(client, &sensors[0]);
 	WriteSensorData(client, &sensors[1]);
-	// WriteSensorData(client, &sensors[2]);
+	WriteSensorData(client, &sensors[2]);
 
 	client->println("</body></html>");
 
@@ -278,16 +328,15 @@ void RenderPage(WiFiClient* client)
 }
 
 void WriteSensorData(WiFiClient* client, SensorData* sensor) {
-	client->println("<h3>"); client->print(sensor->SensorName); client->print("</h3>");
+	client->println("<div class='sensor'><h3>"); client->print(sensor->SensorName); client->print("</h3>");
 	client->print("<table width='100%'>");
-	WriteSensorValue(client, "Temperatur", sensor->Temperature, 1, "Grad");
-	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Humidity, 0, "%");
-	WriteSensorValue(client, "Luftdruck", sensor->Pressure, 0, "hPa");
-	WriteSensorValue(client, "Helligkeit", sensor->Brightness, 0, "cd");
-	WriteSensorValue(client, "Spannung", sensor->Voltage, 2, "V");
-	String lastTime = ntp->GetTimeString(sensor->timestamp);
-	client->printf("<tr><td>Letzter Kontakt</td><td>%s</td</tr>", lastTime.c_str());
-	client->println("</table>");
+	WriteSensorValue(client, "Temperatur", sensor->Value[SENSORTYPE_TEMPERATURE], 1, "Grad");
+	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Value[SENSORTYPE_HUMIDITY], 0, "%");
+	WriteSensorValue(client, "Luftdruck", sensor->Value[SENSORTYPE_PRESSURE], 0, "hPa");
+	WriteSensorValue(client, "Helligkeit", sensor->Value[SENSORTYPE_BRIGHTNESS], 0, "cd");
+	WriteSensorValue(client, "Spannung", sensor->Value[SENSORTYPE_VOLTAGE], 2, "V");
+	client->printf("<tr><td class='footnote left'>Letzter Kontakt vor </td><td class='footnote right'>%s</td</tr>", TimeDifferenceToNow(sensor->timestamp).c_str());
+	client->println("</table></div>");
 }
 
 void WriteSensorValue(WiFiClient* client, const char* description, float data, int precision, const char* suffix)
@@ -296,11 +345,11 @@ void WriteSensorValue(WiFiClient* client, const char* description, float data, i
 	if (data != SENSORDATA_NO_DATA) {
 		dtostrf(data, 6, precision, number_buffer);
 		for (int i = 0; i < sizeof(number_buffer); i++) {
-			if (number_buffer[i] == '.') { 
-				number_buffer[i] = ','; 
+			if (number_buffer[i] == '.') {
+				number_buffer[i] = ',';
 			}
 		}
-		client->printf("<tr><td class='sensorType'>%s</td><td class='sensorValue'>%s %s</td></tr>", description, number_buffer, suffix);
+		client->printf("<tr><td class='sensorReadings left'>%s</td><td class='sensorReadings right'>%s %s</td></tr>", description, number_buffer, suffix);
 	}
 }
 
@@ -320,4 +369,25 @@ void WriteCurrentTime(WiFiClient* client)
 	String s = ntp->GetTimeString(epoch);
 	client->println(s);
 	Serial.println(s);
+}
+
+String TimeDifferenceToNow(unsigned long then)
+{
+	unsigned int seconds = (millis() / 1000 + timeOffset) - then;
+	if (seconds < 0) { return "noch nie"; }
+	String result = "";
+	if (seconds < 60) {
+		result += seconds;
+		result += " Sekunden";
+	}
+	else {
+		seconds /= 60;
+		if (seconds > 60) {
+			result += (seconds / 60);
+			result += " Stunden und ";
+		}
+		result += (seconds % 60);
+		result += " Minuten";
+	}
+	return result;
 }

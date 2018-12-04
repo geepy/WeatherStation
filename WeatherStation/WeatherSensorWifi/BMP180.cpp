@@ -196,6 +196,7 @@ long BMP180::calculateB5(long UT) {
 }
 */
 long BMP180::calculateB5(long UT) {
+
 	long X1 = ((UT - _AC6) * _AC5);
 	X1 = X1 >> 15;
 	long X2 = ((long)_MC << 11) / (X1 + _MD);
@@ -206,6 +207,9 @@ long BMP180::calculateB5(long UT) {
  * Compensate the measured temperature with the calibration data.
  */
 long BMP180::compensateTemperature(long UT) {
+	if (UT < 0) {
+		return 0;
+	}
 	_B5 = calculateB5(UT);
 	return (_B5 + 8) >> 4;
 }

@@ -4,33 +4,20 @@
 const char* SENSOR_DEFAULT_NAME = "(unbenannt)";
 SensorData::SensorData() {
 	this->SensorName = SENSOR_DEFAULT_NAME;
-	this->Brightness =
-		this->Humidity =
-		this->Pressure =
-		this->Temperature =
-		this->Voltage = SENSORDATA_NO_DATA;
+	for (int i = 0; i < NUM_SENSORTYPES; i++) {
+		this->Value[i] = SENSORDATA_NO_DATA;
+	}
 }
 
 void SensorData::WriteToSerial() {
 	char number_buffer[10];
 
-	Serial.print("Data from Sensor ");
-	Serial.print(this->SensorName);
-	Serial.print(": ");
-	Serial.print("Temperature=");
-	dtostrf(this->Temperature, 6, 1, number_buffer);
-	Serial.print(number_buffer);
-	Serial.print("; Pressure=");
-	dtostrf(this->Pressure, 6, 1, number_buffer);
-	Serial.print(number_buffer);
-	Serial.print("Humidity=");
-	dtostrf(this->Humidity, 6, 1, number_buffer);
-	Serial.print(number_buffer);
-	Serial.print("Brightness=");
-	dtostrf(this->Brightness, 6, 1, number_buffer);
-	Serial.print(number_buffer);
-	Serial.print("Voltage=");
-	dtostrf(this->Voltage, 6, 1, number_buffer);
-	Serial.print(number_buffer);
-	Serial.println();
+	String output = String("Data from Sensor ");
+	output += this->SensorName;
+	output += ": Temperature=" + String(this->Value[SENSORTYPE_TEMPERATURE], 1);
+	output += "; Pressure=" + String(this->Value[SENSORTYPE_PRESSURE], 1);
+	output += "; Humidity=" + String(this->Value[SENSORTYPE_HUMIDITY], 1);
+	output += "; Brightness=" + String(this->Value[SENSORTYPE_BRIGHTNESS], 1);
+	output += "; Voltage=" + String(this->Value[SENSORTYPE_VOLTAGE], 1);
+	Serial.println(output);
 }
