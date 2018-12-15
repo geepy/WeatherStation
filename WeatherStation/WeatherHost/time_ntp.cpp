@@ -135,7 +135,7 @@ unsigned long NTP::GetTimestamp()
 		Serial.print(", seconds sincs 1970 is ");
 		ulSecs1970 -= 2208988800UL; // go from 1900 to 1970
 		Serial.println(ulSecs1970);
-	}	
+	}
 	return(ulSecs1970);
 }
 
@@ -203,23 +203,16 @@ String NTP::epoch_to_string(unsigned long epoch)
 	String s;
 	int i;
 
-	s = String(date_time.hour);
-	s += ":";
-	i = date_time.minute;
-	if (i < 10) { s += "0"; }
-	s += i;
-	s += ":";
-	i = date_time.second;
-	if (i < 10) { s += "0"; }
-	s += i;
-	s += " - ";
-	s += date_time.day;
-	s += ".";
-	s += date_time.month;
-	s += ".";
-	s += (int)date_time.year;
+	char buffer[21];
+	sprintf(buffer, "%02d:%02d:%02d %02d.%02d.%04d",
+		date_time.hour,
+		date_time.minute,
+		date_time.second,
+		date_time.day,
+		date_time.month,
+		date_time.year);
 
-	return(s);
+	return(String(buffer));
 }
 
 // returns weekday, 0= monday, 6=sunday 

@@ -4,61 +4,73 @@
  Author:	Günter
 */
 
-// #define LOG
-// #define DEBUG
+#pragma region switches
+
+#define SENSORID 1
+
+#define LOG
+//#define DEBUG
 #define SLEEP
+
+#pragma endregion
+
+
+#pragma region global constants
+
+#if SENSORID==-1
+#define MY_HOSTNAME "Testbed"
 #define HAS_BME280
-//#define HAS_DHT22
-//#define HAS_BMP180
-//#define HAS_BH1750
-
-#define MY_SENSOR_ID 1
-
-#if MY_SENSOR_ID == 0
+#define HAS_BMP180
+#define HAS_BH1750
+#define HAS_DHT22
+#elif SENSORID==0
 #define MY_HOSTNAME "drinnen"
-#elif MY_SENSOR_ID == 1
+#define HAS_BMP180
+#elif SENSORID==1
 #define MY_HOSTNAME "draussen"
-#elif MY_SENSOR_ID == 2
-#define MY_HOSTNAME "schildkroeten"
-#endif 
-
+#define HAS_BME280
+#elif SENSORID==2
+#define MY_HOSTNAME "Schildkroeten"
+#define HAS_BME280
+#endif
 
 #include <SPI.h>
 #include <Wire.h>         // i²c-Schnittstelle
 #include <EEPROM.h>		  // non-volatile memory
-#ifdef HAS_BME280
-#include "BME280.h"
-#endif
-#ifdef HAS_BMP180
-#include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
-#endif
-#ifdef HAS_DHT22
-#include "dht.h"	      // patched Temperatur-/Feuchtigkeit-Sensor
-#endif
-#ifdef HAS_BH1750
-#include <AS_BH1750.h>    // Helligkeitssensor
-#endif
-
 #include <ESP8266WiFi.h>
 #include "WifiIdentifier.h"
 
-#pragma region global constants
+#ifdef HAS_BME280
+#include "BME280.h"
+#endif // HAS_BME280
 
+#ifdef HAS_BMP180
+#include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
+#endif // HAS_BME280
+#ifdef HAS_DHT22
+#include "dht.h"	      // patched Temperatur-/Feuchtigkeit-Sensor
+#endif // HAS_BME280
+#ifdef HAS_BH1750
+#include <AS_BH1750.h>    // Helligkeitssensor
+#endif // HAS_BME280
+
+// Replace with your network credentials
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PWD;
 const char* servername = "wetterstation";
 
+#define delay_ms (90 * 1000)
+
+const int FULL_VOLTAGE = 2800;
+const int LOW_VOLTAGE = 2000;
+
 #ifdef DEBUG
 #define SECONDS_BETWEEN_TICKS 10
-#define MAX_TICKS_BETWEEN_TRANSMISSION 2
 #else
-#define SECONDS_BETWEEN_TICKS 180
-#define MAX_TICKS_BETWEEN_TRANSMISSION 10
+#define SECONDS_BETWEEN_TICKS 120
 #endif
 
-#define delay_ms (SECONDS_BETWEEN_TICKS * 1000)
-
-
+#define SENSOR_POWER D6
 #define SENSOR_CLOCK D1
 #define SENSOR_DATA D2
 
@@ -68,36 +80,17 @@ const int samplesForPressure = 4;
 #define NO_SENSOR_DATA 200
 
 struct {
-	int ticksSinceLastTransmission = 0;
 	float temperature = NO_SENSOR_DATA;
-	boolean temperatureHasChanged = false;
 	float pressure = NO_SENSOR_DATA;
-	boolean pressureHasChanged = false;
 	float humidity = NO_SENSOR_DATA;
-	boolean humidityHasChanged = false;
 	float voltage = NO_SENSOR_DATA;
 } State;
 
-#pragma region global objects
-#ifdef HAS_BH1750
-AS_BH1750 bh1750;							// Helligkeitssensor i²c 23
-#endif
-#ifdef HAS_BME280
-BME280I2C::Settings sensorSettings;
-BME280I2C bme280(sensorSettings);           // Temperatur-, Druck- und Feuchtigkeits-Sensor i²c 76
-#endif
-#ifdef HAS_BMP180
-BMP180 bmp180;								// Temperatur und Druck-Sensor auf i²c 77
-#endif
-#ifdef HAS_DHT22
-DHT dht(D5, DHT22);							// Temperatur- und Feuchte-Sensor SPI
-#endif
-
 WiFiClient client;
-IPAddress myIp(192, 168, 178, 200 + MY_SENSOR_ID);
-IPAddress subnetMaskIp(255,255,255,0);
+IPAddress myIp(192, 168, 178, 100 + SENSORID);
+IPAddress subnetMaskIp(255, 255, 255, 0);
 IPAddress gatewayIp(192, 168, 178, 1);
-IPAddress hostIp(192, 168, 178, 27); 
+IPAddress hostIp(192, 168, 178, 27);
 ADC_MODE(ADC_VCC);//Set the ADCC to read supply voltage.
 #pragma endregion
 
@@ -106,9 +99,7 @@ void setup() {
 #ifdef LOG
 	Serial.begin(115200);
 #endif
-	Wire.begin(D2, D1); // Ports setzen - BME-Treiber macht das nicht...
 #ifdef SLEEP
-	pinMode(LED_BUILTIN, OUTPUT);
 	digitalWrite(LED_BUILTIN, HIGH);
 	loop();
 	digitalWrite(LED_BUILTIN, LOW);
@@ -117,7 +108,6 @@ void setup() {
 	Serial.flush();
 	Serial.end();
 #endif
-	SaveValuesToEeprom();
 	ESP.deepSleep(SECONDS_BETWEEN_TICKS * 1e6); // 1e6 is *10^6 microseconds = secs
 #endif
 	// nach dem sleep beginnt wieder setup()
@@ -125,233 +115,106 @@ void setup() {
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-	InitSensors();
-	LoadValuesFromEeprom();
+	pinMode(SENSOR_POWER, OUTPUT);
+	digitalWrite(SENSOR_POWER, HIGH); // power up temperature sensor
+	delay(1000); // wait until working
 	GetSensorData();
-	State.ticksSinceLastTransmission++;
-	boolean mustTransmit = State.ticksSinceLastTransmission > MAX_TICKS_BETWEEN_TRANSMISSION;
+	digitalWrite(SENSOR_POWER, LOW);
 
-	if (DataChanged() || mustTransmit) {
-		long startTime = millis();
+	{
 		if (WiFiStart()) {
 			ReportData();
 			WiFiStop();
 		}
-#ifdef LOG
-		Serial.printf("\r\n Transmission took %ld milliseconds\r\n", millis() - startTime);
-#endif
 	}
 #ifndef SLEEP
 	delay(delay_ms);
 #endif
 }
 
-void InitSensors() {
-	if (!bme280.begin()) {
-		LogText("cannot initialize BME280.");
-	}
-	else {
-		DumpText("found chip, it is ");
-		DumpValue((int)bme280.chipID());
-	}
-
-#ifdef HAS_BH1750
-	bh1750.begin();
-#endif
-#ifdef HAS_BMP180
-	bmp180.init(SENSOR_DATA, SENSOR_CLOCK); // später, damit die richtigen Pins für i²c gesetzt sind
-#endif
-#ifdef HAS_DHT22
-	dht.begin();
-#endif
-}
-
 void GetSensorData() {
-	float value;
 #ifdef HAS_BME280
-	DumpText("reading temperature [BME]: ");
-	value = readTemperaturefromBME280();
-	DumpValue(value);
-	if (value != State.temperature) {
-		State.temperature = value;
-		State.temperatureHasChanged = true;
-	}
-#endif
-
-#ifdef HAS_BMP180
-	DumpText("reading temperature [BMP]: ");
-	value = readTemperaturefromBMP180();
-	DumpValue(value);
-	if (value != State.temperature) {
-		State.temperature = value;
-		State.temperatureHasChanged = true;
-	}
-#endif
-#ifdef HAS_DHT22
-	DumpText("reading temperature [DHT]: ");
-	value = readTemperatureFromDHT22();
-	DumpValue(value);
-	if (value != State.temperature) {
-		State.temperature = value;
-		State.temperatureHasChanged = true;
-	}
-#endif
-	delay(1000); // dont ask sensor more often than every 2 seconds
-#ifdef HAS_BME280
-	DumpText("reading humidity [BME]: ");
-	value = readHumidityfromBME280();
-	DumpValue(value);
-	if (value != State.humidity) {
-		State.humidity = value;
-		State.humidityHasChanged = true;
-	}
-#endif
-
-#ifdef HAS_DHT22
-	DumpText("reading humidity [DHT]: ");
-	value = readHumidityfromDHT22();
-	DumpValue(value);
-	if (value != State.humidity) {
-		State.humidity = value;
-		State.humidityHasChanged = true;
-	}
-#endif
-#ifdef HAS_BME280
-	DumpText("reading pressure [BME]: ");
-	value = readPressurefromBME280();
-	DumpValue(value);
-	if (value != State.pressure) {
-		State.pressure = value;
-		State.pressureHasChanged = true;
-	}
+	GetSensorDataFromBME280();
 #endif
 #ifdef HAS_BMP180
-	DumpText("reading pressure [BMP]: ");
-	value = readPressurefromBMP180();
-	DumpValue(value);
-	if (value != State.pressure) {
-		State.pressure = value;
-		State.pressureHasChanged = true;
-	}
+	GetSensorDataFromBMP180();
+#endif
+#ifdef HAS_DHT22
+	GetSensorDataFromDHT22();
 #endif
 
-	DumpText("reading Voltage: ");
-	value = ESP.getVcc();
-	DumpValue(value);
+	String debugString = String("reading Voltage: ");
+	float value = ESP.getVcc();
+	debugString += " raw:" + String(value, 3);
 	// value += 300; // NodeMCU Amica
 	value += 230; // LOLIN D1 mini
-	DumpValue(value);
-	if (abs(State.voltage - value) > 10) {
-		State.voltage = value / 1000.;
-	}
-}
-
-boolean DataChanged() {
-	return State.humidityHasChanged 
-		|| State.pressureHasChanged 
-		|| State.temperatureHasChanged;
-}
-
-void ReportData() {
-	if (State.temperature != NO_SENSOR_DATA) {
-		SendData("temperature", State.temperature);
-		State.temperatureHasChanged = false;
-	}
-#if defined(HAS_BME280) || defined(HAS_BMP180)
-	if (State.pressure != NO_SENSOR_DATA) {
-		SendData("pressure", State.pressure);
-		State.pressureHasChanged = false;
-	}
+	debugString += " normalized:" + String(value, 3);
+#ifdef DEBUG
+	Serial.print(debugString);
 #endif
-#if defined(HAS_BME280) || defined(HAS_DHT22)
-	if (State.humidity != NO_SENSOR_DATA) {
-		SendData("humidity", State.humidity);
-		State.humidityHasChanged = false;
-	}
-#endif
-	SendData("voltage", State.voltage);
+	State.voltage = value / 1000.;
 }
 
-void SendData(const char* type, float value) {
-	long startTime = millis();
-	for (int i = 0; i < 5; i++) {
-		if (client.connect(hostIp, 80)) {
-			String data = String("PUT /sensordata/") + MY_SENSOR_ID + "/" + type + "/" + String(value, 4) + " HTTP/1.1";
-			LogText(data.c_str());
-			client.println(data);
-			client.print(String("Host: ") + servername + "\r\n");
-			client.print("Connection: close\r\n\r\n");
-			long timestamp = millis();
-			do
-			{
-				if (millis() - timestamp > 1000) {
-					LogText(" -> no response from server, aborting.");
-					break;
-				}
-				delay(10);
-			} while (client.connected());
-			if (client.available())
-			{
-				String line = client.readStringUntil('\n');
-				LogText("Response:");
-				LogText(line.c_str());
-			}
-			break;
-		}
-		DumpText(" ->no connection made, retrying");
-		delay(1000);
-	}
-	client.stop();
-	LogText("Transmission ended in [ms]");
-	LogValue(millis() - startTime);
-}
-
-//////////////////
-// Connect to WiFi
-//////////////////
-bool WiFiStart()
+#ifdef HAS_BME280
+void GetSensorDataFromBME280()
 {
-	long startTime = millis();
-	// Connect to WiFi network
-#ifdef LOG
-	Serial.printf("Connecting to '%s' ", WIFI_SSID);
-#endif
-	WiFi.forceSleepWake();
-	WiFi.persistent(false); // don't read or write configuration to flash
-	WiFi.mode(WIFI_STA);
-	WiFi.config(myIp, gatewayIp, subnetMaskIp);
-	WiFi.hostname(MY_HOSTNAME);
-	WiFi.begin(WIFI_SSID, WIFI_PWD);
-	for (int retry = 0; retry < 20; retry++) {
-		if (WiFi.status() == WL_CONNECTED)
-		{
-			LogText("connected on IP ");
-			LogText(WiFi.localIP().toString().c_str());
-			return true;
-		}
-		Serial.print(".");
-		delay(1000);
-	}
-	LogText("No Wifi connection possible");
-	return false;
-}
+	BME280I2C::Settings sensorSettings;
+	BME280I2C bme280(sensorSettings);            // Temperatur- und Druck-Sensor
 
-void WiFiStop()
-{
-	WiFi.disconnect(true);
-	WiFi.forceSleepBegin();
+	float value;
+	String debugString = String("getting sensor data: ");
+
+	Wire.begin(SENSOR_DATA, SENSOR_CLOCK);
+
+	if (!bme280.begin()) {
+		debugString += "cannot initialize BME280.\n";
+	}
+	else {
+		debugString += "found chip, it is " + String((int)bme280.chipID()) + "\n";
+	}
+	debugString += "reading temperature: ";
+	value = bme280.temp();
+	if (value != State.temperature) {
+		State.temperature = value;
+	}
+	debugString += String(value, 3) + "\n";
+	debugString += "reading humidity: ";
+	value = bme280.hum();
+	if (value != State.humidity) {
+		State.humidity = value;
+	}
+	debugString += String(value, 3) + "\n";
+	debugString += "reading pressure: ";
+	value = bme280.pres() / 100.;
+	if (value != State.pressure) {
+		State.pressure = value;
+	}
+	debugString += String(value, 3);
+#ifdef DEBUG
+	Serial.println(debugString);
+#endif
 }
+#endif
 
 #ifdef HAS_BMP180
-float readTemperaturefromBMP180()
+void GetSensorDataFromBMP180()
 {
+	float value;
+	String debugString = String("getting sensor data from BMP180: ");
+
+	BMP180 bmp180;
+
+	bmp180.init(SENSOR_DATA, SENSOR_CLOCK);
+	debugString += "reading temperature: ";
 	long ut = bmp180.measureTemperature();
 	int t = bmp180.compensateTemperature(ut);
-	return bmp180.formatTemperature(t);
-}
+	value = t / 100.;
+	if (value != State.temperature) {
+		State.temperature = value;
+	}
+	debugString += String(value, 3) + "\n";
+	debugString += "reading pressure: ";
 
-float readPressurefromBMP180()
-{
 	byte samplingMode = BMP180_OVERSAMPLING_HIGH_RESOLUTION;
 	long up;
 
@@ -362,40 +225,135 @@ float readPressurefromBMP180()
 	}
 	p = p / samplesForPressure;
 
-	return bmp180.formatPressure(p);
+	value = bmp180.formatPressure(p);
+
+	if (value != State.pressure) {
+		State.pressure = value;
+	}
+	debugString += String(value, 3);
+#ifdef DEBUG
+	Serial.println(debugString);
 #endif
-
-#ifdef HAS_BME280
-float readTemperaturefromBME280()
-{
-	return bme280.temp();
-}
-
-float readPressurefromBME280()
-{
-	return bme280.pres() / 100.;
-}
-
-float readHumidityfromBME280()
-{
-	return bme280.hum();
 }
 #endif
 
 #ifdef HAS_DHT22
-float readTemperatureFromDHT22() {
-	return dht.readTemperature();
-}
-
-float readHumidityfromDHT22()
+void GetSensorDataFromDHT22()
 {
-	return dht.readHumidity();
+	float value;
+
+	String debugString = String("getting sensor data from DHT22: ");
+
+	DHT dht(D7, DHT22);        // Temperatur- und Feuchte-Sensor
+
+	dht.begin();
+
+	debugString += "reading temperature: ";
+	value = dht.readTemperature();
+	if (value != State.temperature) {
+		State.temperature = value;
+	}
+	debugString += String(value, 3) + "\n";
+	debugString += "reading humidity: ";
+	delay(2000); // dont query sensor more than every 2 seconds
+	value = dht.readHumidity();
+
+	if (value != State.humidity) {
+		State.humidity = value;
+	}
+	debugString += String(value, 3);
+#ifdef DEBUG
+	Serial.println(debugString);
+#endif
 }
 #endif
+
+
+void ReportData() {
+	if (State.temperature != NO_SENSOR_DATA) {
+		SendData("temperature", State.temperature);
+	}
+	if (State.pressure != NO_SENSOR_DATA) {
+		SendData("pressure", State.pressure);
+	}
+	if (State.humidity != NO_SENSOR_DATA) {
+		SendData("humidity", State.humidity);
+	}
+	SendData("Voltage", State.voltage);
+}
+
+void SendData(const char* type, float value) {
+	LogText("trying to connect");
+	for (int i = 0; i < 5; i++) {
+		if (client.connect(hostIp, 80)) {
+			char number_buffer[20];
+
+			LogText("  ...connected, send data");
+			String data = String("PUT /sensordata/") + String(SENSORID) + "/" + type + "/" + String(value, 2) + " HTTP/1.1";		
+			LogText(data);
+			client.println(data);
+			client.print(String("Host: ") + servername + "\r\n");
+			client.print("Connection: close\r\n\r\n");
+			LogText("  ...awaiting response");
+			long timestamp = millis();
+			while (client.connected())
+			{
+				if (millis() - timestamp > 1000) {
+					LogText("->no response from server, aborting.");
+					break;
+				}
+				if (client.available())
+				{
+					String line = client.readStringUntil('\n');
+					LogText(String("  response: ")+line);
+				}
+			}
+			break;
+		}
+		LogText("  ->no connection made, retrying");
+		delay(3000);
+	}
+	client.stop();
+}
+
+//////////////////
+// Connect to WiFi
+//////////////////
+bool WiFiStart()
+{
+	// Connect to WiFi network
+	LogText(String("Connecting to ")+WIFI_SSID);
+	WiFi.mode(WIFI_STA);
+	WiFi.config(myIp, gatewayIp, subnetMaskIp);
+	WiFi.hostname(MY_HOSTNAME);
+	WiFi.begin(WIFI_SSID, WIFI_PWD);
+	for (int retry = 0; retry < 20; retry++) {
+		if (WiFi.status() == WL_CONNECTED)
+		{
+			LogText(String("WiFi connected on IP ")+WiFi.localIP());
+			return true;
+		}
+		LogText(".");
+		delay(2000);
+	}
+	LogText("No Wifi connection possible");
+	return false;
+}
+
+void WiFiStop()
+{
+	WiFi.disconnect(true);
+}
+float readTemperaturefromBMP180()
+{
+}
 
 #ifdef HAS_BH1750
 float readBrightness()
 {
+	AS_BH1750 bh1750;
+	Wire.begin(SENSOR_DATA, SENSOR_CLOCK);
+	bh1750.begin();
 	return bh1750.readLightLevel();
 }
 #endif
@@ -412,11 +370,10 @@ void SaveValuesToEeprom()
 	EEPROM.commit();
 }
 
+
 void LogValue(float value) {
 #ifdef LOG
-	char buffer[10];
-	dtostrf(value, 5, 2, buffer);
-	Serial.println(buffer);
+	Serial.println(String(value, 3));
 #endif
 }
 
@@ -426,11 +383,15 @@ void LogText(const char* text) {
 #endif
 }
 
+void LogText(String& text) {
+#ifdef LOG
+	Serial.println(text);
+#endif
+}
+
 void DumpValue(float value) {
 #ifdef DEBUG
-	char buffer[10];
-	dtostrf(value, 5, 2, buffer);
-	Serial.println(buffer);
+	Serial.println(String(value, 2));
 #endif
 }
 

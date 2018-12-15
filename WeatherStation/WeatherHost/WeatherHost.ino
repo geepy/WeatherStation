@@ -41,9 +41,6 @@ SensorData sensors[3];
 NTP* ntp = new NTP();
 unsigned long timeOffset = 0;
 
-// init for 5kBaud and RX on pin 4
-RH_ASK driver(2000, D6, D7, 0);
-
 void setup() {
 	Serial.begin(115200);
 
