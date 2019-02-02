@@ -38,6 +38,8 @@ GxEPD_Class display(io /*RST=D4*/ /*BUSY=D2*/); // default selection of D4(=2), 
 
 NTP ntp = NTP();
 unsigned long timeOffset = 0;
+date_time_t lastTime;
+date_time_t currentTime;
 
 
 void drawDate(int day, int month, int year, bool updateWindow = true);
@@ -52,11 +54,12 @@ void setup()
 	Serial.println("setup");
 	display.init(115200); // enable diagnostic output on Serial
 	display.setTextColor(GxEPD_BLACK);
+	display.setRotation(2);
 	drawFrames();
 	WiFiStart();
-	date_time_t t = ntp.GetTimeStruct(ntp.GetLocalTime());
-	drawTime(t.hour, t.minute);
-	drawDate(t.day, t.month, t.year);
+	lastTime = ntp.GetTimeStruct(ntp.GetLocalTime());
+	currentTime = lastTime;
+	drawTimeAndDate();
 
 	SensorData state = SensorData();
 	state.temperature = -45.67;
@@ -70,19 +73,28 @@ void setup()
 
 void loop()
 {
-
-
+	delay(1000);
+	currentTime.second++;
+	if (currentTime.second > 59) {
+		currentTime.second = 0;
+		currentTime.minute++;
+		if (currentTime.minute > 59) {
+			currentTime = ntp.GetTimeStruct(ntp.GetLocalTime());
+		}
+	}
+	if (currentTime.minute != lastTime.minute) {
+		lastTime = currentTime;
+		drawTimeAndDate();
+	}
 }
 
 void drawRect(int x, int y, int w, int h) {
-	display.setRotation(2);
 	display.drawRect(x, y, h, w, GxEPD_BLACK);
 	display.drawRect(x + 1, y + 1, h - 2, w - 2, GxEPD_WHITE);
 	display.drawRect(x + 2, y + 2, h - 4, w - 4, GxEPD_BLACK);
 	display.updateWindow(x, y, h + 1, w + 1);
 }
 void drawFrames() {
-	display.setRotation(2);
 	display.drawRect(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
 
 	// oben links
@@ -105,15 +117,20 @@ void drawText(const char *text, int y, int x, bool updateWindow = true)
 	int16_t  x1, y1;
 	uint16_t w, h;
 
+	uint8_t oldRotation = display.getRotation();
+	display.setRotation(3);
+
 	LogText(String("drawing '") + text + "' to coordinates" + String(x) + " x " + String(y));
 	display.setTextColor(GxEPD_BLACK);
-	display.setRotation(3);
 	display.getTextBounds(text, x, 176 - y, &x1, &y1, &w, &h);
 	display.setCursor(x, 176 - y);
 	display.print(text);
 	if (updateWindow) {
+		LogText(String("  updating window (") + String(x1) + " x " + String(y1) + " size " + String(w) + " x " + String(h));
 		display.updateWindow(x1, y1, w, h);
 	}
+
+	display.setRotation(oldRotation);
 }
 
 void drawTextRightAligned(const char *text, int y, int x, bool updateWindow = true)
@@ -121,16 +138,22 @@ void drawTextRightAligned(const char *text, int y, int x, bool updateWindow = tr
 	int16_t  x1, y1;
 	uint16_t w, h;
 
+	uint8_t oldRotation = display.getRotation();
+	display.setRotation(3);
+
 	LogText(String("drawing '") + text + "' right aligned to coordinates" + String(x) + " x " + String(y));
 	display.setTextColor(GxEPD_BLACK);
-	display.setRotation(3);
 	display.getTextBounds(text, 0, 176 - y, &x1, &y1, &w, &h);
 	display.setCursor(x - w, 176 - y);
 	display.print(text);
 	if (updateWindow) {
+		LogText(String("  updating window (") + String(x1) + " x " + String(y1) + " size " + String(w) + " x " + String(h));
 		display.updateWindow(x + x1, y1, w, h);
 	}
+
+	display.setRotation(oldRotation);
 }
+
 
 void drawTime(int hours, int minutes, bool updateWindow)
 {
@@ -148,6 +171,13 @@ void drawDate(int day, int month, int year, bool updateWindow)
 	drawText(buffer, 158, 78, updateWindow);
 }
 
+void drawTimeAndDate() {
+	display.fillRect(111, 76, 64, 112, GxEPD_WHITE);
+	drawTime(lastTime.hour, lastTime.minute, false);
+	drawDate(lastTime.day, lastTime.month, lastTime.year, false);
+	display.updateWindow(111, 76, 64, 112);
+}
+
 const unsigned char *Bmps[3] = { Bmp_Haus, Bmp_Baum, Bmp_Turtle };
 
 void drawSensorData(int index, SensorData& data)
@@ -158,22 +188,20 @@ void drawSensorData(int index, SensorData& data)
 		h = 102;
 
 	int border = w - 24;
-	display.setRotation(2);
 	display.fillRect(y1, x1, h, w, GxEPD_WHITE);
-	display.drawBitmap(y1+84, x1+2, Bmps[index], 16, 16, GxEPD_BLACK);
+	display.drawBitmap(y1 + 84, x1 + 2, Bmps[index], 16, 16, GxEPD_BLACK);
 	display.setFont(&Open_Sans_SemiBold_26);
 	String value = String(data.temperature, 1);
-	drawTextRightAligned(value.c_str(), 58, x1 + border - 1, false);
-	drawText("C", 58, x1 + border + 2, false);
+	drawTextRightAligned(value.c_str(), 58, x1 + border + 1, false);
+	drawText("C", 58, x1 + border + 4 , false);
 	value = String(data.humidity, 1);
 	drawTextRightAligned(value.c_str(), 28, x1 + border - 1, false);
 	drawText("%", 28, x1 + border + 2, false);
 	display.setFont(&Open_Sans_SemiBold_18);
 	value = String(data.pressure, 0);
-	drawTextRightAligned(value.c_str(), 4, x1 + border - 1, false);
+	drawTextRightAligned(value.c_str(), 4, x1 + border - 10, false);
 	display.setFont(&Open_Sans_Condensed_Bold_18);
-	drawText("hPa", 4, x1 + border + 2, false);
-	display.setRotation(2);
+	drawText("hPa", 4, x1 + border -8, false);
 	display.updateWindow(y1, x1, h, w);
 }
 
