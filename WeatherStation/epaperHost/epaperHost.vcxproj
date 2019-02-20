@@ -107,6 +107,8 @@
     <ClInclude Include="..\WifiIdentifier.h" />
     <ClInclude Include="Bitmaps.h" />
     <ClInclude Include="DHT.h" />
+    <ClInclude Include="display.h" />
+    <ClInclude Include="Log.h" />
     <ClInclude Include="Open_Sans_Condensed_18.h" />
     <ClInclude Include="Open_Sans_Semibold_18.h" />
     <ClInclude Include="Open_Sans_SemiBold_26.h" />
@@ -119,6 +121,8 @@
     <ClCompile Include="DejaVu_Sans_12.h" />
     <ClCompile Include="DejaVu30.cpp" />
     <ClCompile Include="DHT.cpp" />
+    <ClCompile Include="display.cpp" />
+    <ClCompile Include="Log.cpp" />
     <ClCompile Include="Open_Sans_SemiBold_36.h" />
     <ClCompile Include="SensorData.cpp" />
   </ItemGroup>

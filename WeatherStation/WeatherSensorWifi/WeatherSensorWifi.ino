@@ -6,7 +6,7 @@
 
 #pragma region switches
 
-#define SENSORID 1
+#define SENSORID 2
 
 #define LOG
 //#define DEBUG
@@ -23,7 +23,7 @@
 #define HAS_BMP180
 #define HAS_BH1750
 #define HAS_DHT22
-#elif SENSORID==0
+#elif SENSORID==1
 #define MY_HOSTNAME "drinnen"
 #define HAS_BMP180
 #elif SENSORID==1
@@ -79,12 +79,12 @@ const int samplesForPressure = 4;
 
 #define NO_SENSOR_DATA 200
 
-struct {
+struct StateStruct {
 	float temperature = NO_SENSOR_DATA;
 	float pressure = NO_SENSOR_DATA;
 	float humidity = NO_SENSOR_DATA;
 	float voltage = NO_SENSOR_DATA;
-} State;
+} State[2];
 
 WiFiClient client;
 IPAddress myIp(192, 168, 178, 100 + SENSORID);
@@ -113,17 +113,23 @@ void setup() {
 	// nach dem sleep beginnt wieder setup()
 }
 
+void GetSensorData(uint8_t addr, StateStruct& state);
+void GetSensorDataFromBME280(uint8_t addr, StateStruct& state);
+void ReportData(int8_t id, StateStruct& state);
+
 // the loop function runs over and over again until power down or reset
 void loop() {
 	pinMode(SENSOR_POWER, OUTPUT);
 	digitalWrite(SENSOR_POWER, HIGH); // power up temperature sensor
 	delay(1000); // wait until working
-	GetSensorData();
+	GetSensorData(0x76, State[0]);
+	GetSensorData(0x77, State[1]);
 	digitalWrite(SENSOR_POWER, LOW);
 
 	{
 		if (WiFiStart()) {
-			ReportData();
+			ReportData(1, State[0]);
+			ReportData(2, State[1]);
 			WiFiStop();
 		}
 	}
@@ -132,9 +138,10 @@ void loop() {
 #endif
 }
 
-void GetSensorData() {
+
+void GetSensorData(uint8_t addr, StateStruct& state) {
 #ifdef HAS_BME280
-	GetSensorDataFromBME280();
+	GetSensorDataFromBME280(addr, state);
 #endif
 #ifdef HAS_BMP180
 	GetSensorDataFromBMP180();
@@ -152,13 +159,14 @@ void GetSensorData() {
 #ifdef DEBUG
 	Serial.print(debugString);
 #endif
-	State.voltage = value / 1000.;
+	state.voltage = value / 1000.;
 }
 
 #ifdef HAS_BME280
-void GetSensorDataFromBME280()
+void GetSensorDataFromBME280(uint8_t addr, StateStruct& state)
 {
 	BME280I2C::Settings sensorSettings;
+	sensorSettings.bme280Addr = addr;
 	BME280I2C bme280(sensorSettings);            // Temperatur- und Druck-Sensor
 
 	float value;
@@ -174,21 +182,15 @@ void GetSensorDataFromBME280()
 	}
 	debugString += "reading temperature: ";
 	value = bme280.temp();
-	if (value != State.temperature) {
-		State.temperature = value;
-	}
+	state.temperature = value;
 	debugString += String(value, 3) + "\n";
 	debugString += "reading humidity: ";
 	value = bme280.hum();
-	if (value != State.humidity) {
-		State.humidity = value;
-	}
+	state.humidity = value;
 	debugString += String(value, 3) + "\n";
 	debugString += "reading pressure: ";
 	value = bme280.pres() / 100.;
-	if (value != State.pressure) {
-		State.pressure = value;
-	}
+	state.pressure = value;
 	debugString += String(value, 3);
 #ifdef DEBUG
 	Serial.println(debugString);
@@ -269,27 +271,27 @@ void GetSensorDataFromDHT22()
 #endif
 
 
-void ReportData() {
-	if (State.temperature != NO_SENSOR_DATA) {
-		SendData("temperature", State.temperature);
+void ReportData(int8_t id, StateStruct& state) {
+	if (state.temperature != NO_SENSOR_DATA) {
+		SendData(id, "temperature", state.temperature);
 	}
-	if (State.pressure != NO_SENSOR_DATA) {
-		SendData("pressure", State.pressure);
+	if (state.pressure != NO_SENSOR_DATA) {
+		SendData(id, "pressure", state.pressure);
 	}
-	if (State.humidity != NO_SENSOR_DATA) {
-		SendData("humidity", State.humidity);
+	if (state.humidity != NO_SENSOR_DATA) {
+		SendData(id, "humidity", state.humidity);
 	}
-	SendData("Voltage", State.voltage);
+	SendData(id, "Voltage", state.voltage);
 }
 
-void SendData(const char* type, float value) {
+void SendData(int8_t id, const char* type, float value) {
 	LogText("trying to connect");
 	for (int i = 0; i < 5; i++) {
 		if (client.connect(hostIp, 80)) {
 			char number_buffer[20];
 
 			LogText("  ...connected, send data");
-			String data = String("PUT /sensordata/") + String(SENSORID) + "/" + type + "/" + String(value, 2) + " HTTP/1.1";		
+			String data = String("PUT /sensordata/") + String(id) + "/" + type + "/" + String(value, 2) + " HTTP/1.1";		
 			LogText(data);
 			client.println(data);
 			client.print(String("Host: ") + servername + "\r\n");

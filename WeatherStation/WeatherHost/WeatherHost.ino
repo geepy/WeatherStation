@@ -48,8 +48,6 @@ void setup() {
 	sensors[1].SensorName = SENSOR1_NAME;
 	sensors[2].SensorName = SENSOR2_NAME;
 	// Connect to Wi-Fi network with SSID and password
-	if (!driver.init())
-		Serial.println("init of RF receiver failed");
 	ConnectToWifi();
 	GetCurrentTime();
 }
@@ -122,13 +120,6 @@ void loop() {
 	}
 	uint8_t buf[RH_ASK_MAX_MESSAGE_LEN];
 	uint8_t buflen = sizeof(buf);
-
-	if (driver.recv(buf, &buflen)) // Non-blocking
-	{
-		buf[buflen] = 0;
-		driver.printBuffer("raw serial data:", buf, buflen);
-		ProcessSerialSensorData(buf);
-	}
 }
 
 bool ParseUri(String& uri, UriData& result) {
