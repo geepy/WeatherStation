@@ -98,11 +98,10 @@ unsigned long NTP::GetTimestamp()
 {
 	unsigned long ulSecs1970;
 
-	WiFi.hostByName("pool.ntp.org", timeServer);
+	WiFi.hostByName("0.pool.ntp.org", timeServer);
 	Serial.println("NTP: starting udp conversation");
 	udp.begin(ntpPort);
 	sendNTPpacket(timeServer); // send an NTP packet to a time server
-	delay(1000);    // wait to see if a reply is available
 	int cb = 0, repeat = 0;
 	while (!cb && repeat < 20)  // try for 2 sec
 	{

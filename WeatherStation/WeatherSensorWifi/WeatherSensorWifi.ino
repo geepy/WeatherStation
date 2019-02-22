@@ -6,7 +6,7 @@
 
 #pragma region switches
 
-#define SENSORID 2
+#define SENSORID 1
 
 #define LOG
 //#define DEBUG
@@ -25,13 +25,11 @@
 #define HAS_DHT22
 #elif SENSORID==1
 #define MY_HOSTNAME "drinnen"
-#define HAS_BMP180
-#elif SENSORID==1
-#define MY_HOSTNAME "draussen"
 #define HAS_BME280
-#elif SENSORID==2
+#elif SENSORID==1
 #define MY_HOSTNAME "Schildkroeten"
 #define HAS_BME280
+#define HAS_BME280_2
 #endif
 
 #include <SPI.h>
@@ -123,13 +121,17 @@ void loop() {
 	digitalWrite(SENSOR_POWER, HIGH); // power up temperature sensor
 	delay(1000); // wait until working
 	GetSensorData(0x76, State[0]);
+#ifdef HAS_BME280_2
 	GetSensorData(0x77, State[1]);
+#endif
 	digitalWrite(SENSOR_POWER, LOW);
 
 	{
 		if (WiFiStart()) {
-			ReportData(1, State[0]);
-			ReportData(2, State[1]);
+			ReportData(SENSORID, State[0]);
+#ifdef HAS_BME280_2
+			ReportData(SENSORID+1, State[1]);
+#endif
 			WiFiStop();
 		}
 	}
@@ -285,6 +287,7 @@ void ReportData(int8_t id, StateStruct& state) {
 }
 
 void SendData(int8_t id, const char* type, float value) {
+	if (isnan(value)) return;
 	LogText("trying to connect");
 	for (int i = 0; i < 5; i++) {
 		if (client.connect(hostIp, 80)) {

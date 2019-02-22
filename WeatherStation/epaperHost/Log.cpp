@@ -4,6 +4,8 @@
 
 #include "Log.h"
 
+// #define LOG
+
 void LogValue(float value) {
 #ifdef LOG
 	Serial.println(String(value, 3));

@@ -4,8 +4,10 @@
 #define _DISPLAY_h
 
 #include "arduino.h"
+
 #include "SensorData.h"
 #include "time_ntp.h"
+
 
 class EpaperDisplay {
 public:
