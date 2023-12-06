@@ -1,19 +1,32 @@
-#include <gfxfont.h>
+#include <ssd1306_uart.h>
+#include <ssd1306_generic.h>
+#include <ssd1306_fonts.h>
+#include <ssd1306_console.h>
+#include <ssd1306_8bit.h>
+#include <ssd1306_1bit.h>
+#include <ssd1306_16bit.h>
+#include <sprite_pool.h>
+#include <nano_gfx_types.h>
+#include <nano_gfx.h>
+#include <nano_engine.h>
+#include <font6x8.h>
+#include <oled.h>
+#include <splash.h>
 #include <SPI.h>
 #include <RH_ASK.h>		  // für Funkübertragung
 #include <Wire.h>         // i²c-Schnittstelle
 #include "LowPower.h"     // deep sleep mode
 #include "BMP180.h"       // patched Temperatur-/Luftdruck-Sensor
 #include "dht.h"	      // patched Temperatur-/Feuchtigkeit-Sensor
-#include <AS_BH1750.h>    // Helligkeitssensor
+#include <BH1750.h>    // Helligkeitssensor
 
 #include <ssd1306.h>      // OLED-Display 128x64
-#include <font6x8.h>      // oled font
+// #include <font6x8.h>      // oled font
 
 #define LOG_TRANSMIT
 unsigned long counter;
 BMP180 bmp180;            // Temperatur- und Druck-Sensor
-AS_BH1750 bh1750;         // Helligkeitssensor
+BH1750 bh1750;         // Helligkeitssensor
 
 #define DHT_POWERPIN 8
 #define DHT_GNDPIN 6

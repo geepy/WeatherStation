@@ -1,11 +1,15 @@
 // Load Wi-Fi library
 #include <SPI.h>
-#include <RH_ASK.h>
+// #include <RH_ASK.h>
 #include <ESP8266WiFi.h>
 #include "WifiIdentifier.h"
 
 #include "SensorData.h"
 #include "time_ntp.h"
+
+#ifndef RH_ASK_MAX_MESSAGE_LEN
+#define RH_ASK_MAX_MESSAGE_LEN 128
+#endif
 
 
 // Replace with your network credentials
@@ -33,9 +37,9 @@ bool ParseUri(String& uri, UriData& result);
 
 const char* SENSORDATA_HEADER = "sensordata";
 // storage
-#define SENSOR0_NAME "Drinnen"
-#define SENSOR1_NAME "Drau&szlig;en"
-#define SENSOR2_NAME "Schildkr&ouml;ten"
+const char* SENSOR0_NAME = "Drinnen";
+const char* SENSOR1_NAME = "K&uuml;hlschrank";
+const char* SENSOR2_NAME = "Keller";
 SensorData sensors[3];
 
 NTP* ntp = new NTP();
@@ -56,7 +60,8 @@ void loop() {
 	WiFiClient client = server.available();   // Listen for incoming clients
 
 	if (client) {                             // If a new client connects,
-		Serial.println("New Client.");          // print a message out in the serial port
+		Serial.print("New Client from IP ");
+		Serial.println(client.remoteIP());
 		String method = "";
 		boolean hasMethod = false;
 		String stem = "";
@@ -283,20 +288,23 @@ void RenderPage(WiFiClient* client)
 	client->println("<!DOCTYPE html><html>");
 	client->println("<head>");
 	client->println("<meta http-equiv='refresh' content='60'>");
-	client->println("<meta name='viewport' content='width = 640, height=960,initial - scale = 1'>");
+	client->println("<meta name='viewport' content='width = 640, height=960,initial-scale=1'>");
 	client->println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"icon\" type = \"image/x-icon\" / >");
 	client->println("<link href = \"data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA0vkAAAAAAADX/wAAWPYAAFLnACsqKwAAWvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREREREREREREREWYRERERERZjFmFhEREREWNmZmFhERZmYCImZmEREWYgESJmEREWYiEiEiYWEWZiICIiJmYRYWIlIhImYREUQiIiIiYRERZmICIiZhYRFhZiIiZmYRERFmNmZmEREREWFmEWZhERERERZhERERERERERERERH//wAA/n8AAPEvAAD4CwAAwAMAAOAHAADABQAAgAEAAKADAADABwAAwAUAANADAADwDwAA9McAAP5/AAD//wAA\" rel = \"shortcut icon\" type = \"image/x-icon\" / >");
 	// CSS 
 	client->println("<style>");
 	client->print("html { font-family: Helvetica; font-size:20px; display: inline-block; margin: 0px auto; text-align: center;} ");
 	client->print("h3 { font-size:24pt; font-weight:bold; text-align:left; align:left;} ");
-	client->print(".sensorReadings { font-size:24pt; font-weight:250; width:50 % ; padding-right:12px; padding-left:12px; }");
-	client->print(".sensor { background-color:#f8f8f8; }");
+	client->print("td { width:50% ; padding-right:12px; padding-left:12px; }");
+	client->print(".sensorReadings { font-size:24pt; font-weight:250; }");
+	client->print(".sensorGood { background-color:#AAFF56; }");
+	client->print(".sensorWarning { background-color:#F1FF5E; }");
+	client->print(".sensorCritical { background-color:#FF633D; }");
+	client->print(".sensorMissing { background-color:#f8f8f8; }");
 	client->print(".smaller { font-size:18pt; }");
 	client->print(".footnote { font-size:12pt; }");
 	client->print(".left { text-align:right; }");
 	client->print(".right { text-align:left; }");
-	client->print(".footnote { font-size:12pt; }");
 	client->println("</style>");
 	client->println("</head>");
 
@@ -306,7 +314,7 @@ void RenderPage(WiFiClient* client)
 	WriteCurrentTime(client);
 
 	WriteSensorData(client, &sensors[0]);
-	WriteSensorData(client, &sensors[1]);
+	WriteSensorData(client, &sensors[1], 6.5, 1, 2.5);
 	WriteSensorData(client, &sensors[2]);
 
 	client->println("</body></html>");
@@ -316,14 +324,39 @@ void RenderPage(WiFiClient* client)
 }
 
 void WriteSensorData(WiFiClient* client, SensorData* sensor) {
-	client->println("<div class='sensor'><h3>"); client->print(sensor->SensorName); client->print("</h3>");
+	WriteSensorData(client, sensor, 0, 0, 0);
+}
+
+void WriteSensorData(WiFiClient* client, SensorData* sensor, float targetTemperature, float warningDelta, float criticalDelta) {
+	char* headerClassName = "sensorGood";
+	{
+		float actualTemperature = sensor->Value[SENSORTYPE_TEMPERATURE];
+		if (actualTemperature == SENSORDATA_NO_DATA) {
+			headerClassName = "sensorMissing";
+		}
+		else if (criticalDelta != 0) {
+			float actualDelta = actualTemperature - targetTemperature;
+			if (actualDelta > criticalDelta || actualDelta < -criticalDelta) {
+				headerClassName = "sensorCritical";
+			}
+			else if (actualDelta > warningDelta || actualDelta < -warningDelta) {
+				headerClassName = "sensorWarning";
+			}
+		}
+	}
+	client->printf("<div class='%s'><h3>", headerClassName); client->print(sensor->SensorName); client->print("</h3>");
 	client->print("<table width='100%'>");
 	WriteSensorValue(client, "Temperatur", sensor->Value[SENSORTYPE_TEMPERATURE], 1, "Grad");
 	WriteSensorValue(client, "Luftfeuchtigkeit", sensor->Value[SENSORTYPE_HUMIDITY], 0, "%");
 	WriteSensorValue(client, "Luftdruck", sensor->Value[SENSORTYPE_PRESSURE], 0, "hPa");
 	WriteSensorValue(client, "Helligkeit", sensor->Value[SENSORTYPE_BRIGHTNESS], 0, "cd");
-	WriteSensorValue(client, "Spannung", sensor->Value[SENSORTYPE_VOLTAGE], 2, "V");
-	client->printf("<tr><td class='footnote left'>Letzter Kontakt vor </td><td class='footnote right'>%s</td</tr>", TimeDifferenceToNow(sensor->timestamp).c_str());
+	// WriteSensorValue(client, "Spannung", sensor->Value[SENSORTYPE_VOLTAGE], 2, "V");
+	if (sensor->timestamp > 0) {
+		client->printf("<tr><td class='footnote left'>Letzter Kontakt vor </td><td class='footnote right'>%s</td</tr>", TimeDifferenceToNow(sensor->timestamp).c_str());
+	}
+	else {
+		client->printf("<tr><td class='footnote left'>Bisher kein Kontakt</td><td class='footnote right'></td</tr>");
+	}
 	client->println("</table></div>");
 }
 
@@ -362,7 +395,7 @@ void WriteCurrentTime(WiFiClient* client)
 String TimeDifferenceToNow(unsigned long then)
 {
 	unsigned int seconds = (millis() / 1000 + timeOffset) - then;
-	if (seconds < 0) { return "noch nie"; }
+	if (seconds < 0 || seconds > 86400) { return "noch nie"; }
 	String result = "";
 	if (seconds < 60) {
 		result += seconds;

@@ -190,7 +190,7 @@ void NTP::epoch_to_date_time(date_time_t* date_time, unsigned long epoch)
 	date_time->year = years + year + 1970;
 	date_time->month = month + 1;
 	date_time->day = epoch - days[year][month] + 1;
-	Serial.printf("NTP: transform %lu to %d\x2e%d\x2e%d %d\x3a%d\x3a%d", inputValue,
+	Serial.printf("NTP: transform %lu to %d . %d . %d %d : %d : %d", inputValue,
 		date_time->day, date_time->month, date_time->year, date_time->hour, date_time->minute, date_time->second);
 	Serial.println();
 }

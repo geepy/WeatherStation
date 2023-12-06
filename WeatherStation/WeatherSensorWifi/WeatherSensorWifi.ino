@@ -6,7 +6,7 @@
 
 #pragma region switches
 
-#define SENSORID 1
+#define SENSORID 2
 
 #define LOG
 //#define DEBUG
@@ -26,7 +26,7 @@
 #elif SENSORID==1
 #define MY_HOSTNAME "drinnen"
 #define HAS_BME280
-#elif SENSORID==1
+#elif SENSORID==2
 #define MY_HOSTNAME "Schildkroeten"
 #define HAS_BME280
 #define HAS_BME280_2
@@ -335,7 +335,7 @@ bool WiFiStart()
 	for (int retry = 0; retry < 20; retry++) {
 		if (WiFi.status() == WL_CONNECTED)
 		{
-			LogText(String("WiFi connected on IP ")+WiFi.localIP());
+			LogText(String("WiFi connected on IP ")+WiFi.localIP().toString());
 			return true;
 		}
 		LogText(".");

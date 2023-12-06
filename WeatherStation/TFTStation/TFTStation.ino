@@ -1,23 +1,16 @@
-#include <Adafruit_GrayOLED.h>
+// setup for TFT driver
+
+#define FS_NO_GLOBALS
+#include <FS.h>
+#include <TFT_eSPI.h>
 #include <SPI.h>
-
-#include <gfxfont.h>
-#include <Adafruit_SPITFT_Macros.h>
-#include <Adafruit_SPITFT.h>
-#include <Adafruit_GFX.h>
-#include <GxFont_GFX.h>
-#include <GxEPD.h>
-
-#include <GxGDEW027W3/GxGDEW027W3.h>      // 2.7" b/w
-#include <GxIO/GxIO_SPI/GxIO_SPI.h>
-#include <GxIO/GxIO.h>
-
 #include <ESP8266WiFi.h>
-#include "WifiIdentifier.h"
-#include "time_ntp.h"
-#include "SensorData.h"
-#include "display.h"
-#include "Log.h"
+
+#include "..\WifiIdentifier.h"
+#include "src\time_ntp.h"
+#include "src\SensorData.h"
+#include "src\display.h"
+#include "src\Log.h"
 
 #define MY_HOSTNAME "Wetterdisplay"
 
@@ -37,12 +30,13 @@ date_time_t lastTime;
 date_time_t currentTime;
 SensorData* state[3];
 
-EpaperDisplay display = EpaperDisplay();
+TftDisplay display = TftDisplay();
 
 void GetData(SensorData& state);
 float GetData(int8_t id, const char* type);
 
 unsigned long lastMinute;
+
 void setup()
 {
 	state[0] = new SensorData();
@@ -122,10 +116,10 @@ void DisplaySensorData(uint8_t index) {
 }
 
 void GetData(int8_t id, SensorData& state) {
-			state.temperature = GetData(id, "temperature");
-			state.pressure = GetData(id, "pressure");
-			state.humidity = GetData(id, "humidity");
-			state.voltage = GetData(id, "voltage");
+	state.temperature = GetData(id, "temperature");
+	state.pressure = GetData(id, "pressure");
+	state.humidity = GetData(id, "humidity");
+	state.voltage = GetData(id, "voltage");
 }
 
 float GetData(int8_t id, const char* type) {
