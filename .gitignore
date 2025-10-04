@@ -330,3 +330,11 @@ ASALocalRun/
 .mfractor/
 /WeatherStation/WeatherHost/WifiIdentifier.h
 /WeatherStation/WifiIdentifier.h
+
+# VS Code
+.vscode/
+
+# 
+__vm/
+
+
